@@ -1,0 +1,5 @@
+out/*
+dict/*
+config.json
+**/__pycache__
+**/__pycache__/**
