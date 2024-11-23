@@ -420,7 +420,7 @@ async def play_add(ctx) :
              await ctx.send('添付ファイルが多すぎます。1つの音声ファイル(.mp3)を添付してください')
              return
 
-        await ctx.send(attachment.content_type)
+        attachment = ctx.message.attachments[0]
         if attachment.content_type is None or attachment.content_type != 'audio/mpeg' :
              await ctx.send('添付ファイルが音声ファイル(.mp3)ではありません。音声ファイル(.mp3)を添付してください')
              return
