@@ -22,10 +22,12 @@ VV_SAYO = 46
 
 os.makedirs("out", exist_ok=True)
 os.makedirs("dict", exist_ok=True)
+os.makedirs("play", exist_ok=True)
 
 CONFIG_FILE = "config.json"
 WORD_DICT_FILE = "dict/word_dict.npy"
 TALK_DICT_FILE = "dict/talk_dict.npy"
+PLAY_DICT_FILE = "dict/play_dict.npy"
 
 try :
     with open(CONFIG_FILE) as f:
@@ -38,19 +40,23 @@ intents=discord.Intents.all()
 
 queue_dict = defaultdict(deque)
 
+#辞書機能
 if not os.path.isfile(WORD_DICT_FILE) :
     dict = {}
     np.save(WORD_DICT_FILE, dict)
-
-if not os.path.isfile(TALK_DICT_FILE) :
-    dict = {}
-    np.save(TALK_DICT_FILE, dict)
-
-#辞書機能
 word_dict = np.load(WORD_DICT_FILE, allow_pickle=True).item()
 
 # おはなし機能
+if not os.path.isfile(TALK_DICT_FILE) :
+    dict = {}
+    np.save(TALK_DICT_FILE, dict)
 talk_dict = np.load(TALK_DICT_FILE, allow_pickle=True).item()
+
+if not os.path.isfile(PLAY_DICT_FILE) :
+    dict = {}
+    np.save(PLAY_DICT_FILE, dict)
+play_dict = np.load(PLAY_DICT_FILE, allow_pickle=True).item()
+
 
 fs = 24000
 seed = 4183
@@ -152,10 +158,11 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
     )
     wav_s = AudioSegment.silent(duration=100, frame_rate=24000)
     wav = wav_s + wav_a.fade_in(100).fade_out(100) + wav_s
-    wav.export(f"out/out_{count}.wav",format='wav')
-    sound = pydub.AudioSegment.from_wav(f"out/out_{count}.wav")
-    sound.export(f"out/out_{count}.mp3", format="mp3")
-    enqueue(message.guild, FFmpegPCMAudio(f"out/out_{count}.mp3"))
+    wav.export(f"out/out_{message.guild.id}_{count}.wav",format='wav')
+    sound = pydub.AudioSegment.from_wav(f"out/out_{message.guild.id}_{count}.wav")
+    sound.export(f"out/out_{message.guild.id}_{count}.mp3", format="mp3")
+    os.remove(f"out/out_{message.guild.id}_{count}.wav") 
+    enqueue(message.guild, FFmpegPCMAudio(f"out/out_{message.guild.id}_{count}.mp3"))
 
 def enqueue(guild, source):
     global voiceChannel
@@ -163,14 +170,14 @@ def enqueue(guild, source):
     queue.append(source)
 
     if not voiceChannel.is_playing():
-        play(queue)
+        play_queue(queue)
 
-def play(queue):
+def play_queue(queue):
     global voiceChannel
     if not queue or voiceChannel.is_playing():
         return
     source = queue.popleft()
-    voiceChannel.play(source, after=lambda e:play(queue))
+    voiceChannel.play(source, after=lambda e:play_queue(queue))
 
 # @bot.command()
 # async def talk_f(ctx, arg) :
@@ -194,6 +201,10 @@ async def c(ctx) :
 
         if voiceChannel is not None :
             await ctx.send('もういますよ。')
+            return
+
+        if ctx.message.author.voice is None :
+            await ctx.send('ボイスチャットで呼んでください。')
             return
 
         voiceChannel = await VoiceChannel.connect(ctx.message.author.voice.channel)
@@ -222,6 +233,31 @@ async def d(ctx) :
         await voiceChannel.disconnect()
         voiceChannel = None
         eniaIsIn = False
+        queue = queue_dict[ctx.message.guild.id]
+        queue.clear()
+        return
+
+@bot.command()
+async def next(ctx) :
+        global eniaIsIn
+        global voiceChannel
+        global text_channel_id
+        if voiceChannel is None :
+            await ctx.send('ボイスチャットで呼んでください。')
+            return
+        if ctx.message.channel.id != text_channel_id :
+            await ctx.send('ボイスチャットで呼んでください。')
+            return
+ 
+        if voiceChannel.is_playing():
+            voiceChannel.stop()
+            queue = queue_dict[ctx.message.guild.id]
+            if len(queue) >=1 :
+                play_queue(queue)
+            await ctx.message.add_reaction('👍')
+        else :
+            await ctx.message.add_reaction('💤')
+ 
         return
 
 
@@ -341,5 +377,90 @@ async def talk_rm(ctx, arg : str) :
         else :
             await ctx.send('登録されていません。 : ' + arg)
 
+@bot.command()
+async def play(ctx, arg : str) :
+        global eniaIsIn
+        global voiceChannel
+        global text_channel_id
+        global play_dict
+        if voiceChannel is None :
+            await ctx.send('ボイスチャットで呼んでください。')
+            return
+        if ctx.message.channel.id != text_channel_id :
+            await ctx.send('ボイスチャットで呼んでください。')
+            return
+
+        if arg in play_dict :
+            filename = play_dict[arg]
+            filepath = 'play/' + filename
+            if os.path.isfile(filepath) :
+                enqueue(ctx.message.guild, FFmpegPCMAudio(filepath))
+                await ctx.send('再生: ' + filename)
+            else :
+                await ctx.send('ファイルがありません: ' + filename)
+  
+        else :
+            await ctx.send('登録されていません。 : ' + arg)
+
+        return
+
+@bot.command()
+async def play_add(ctx) :
+        global play_dict
+
+        if ctx.message.attachments is None :
+             await ctx.send('添付ファイルを確認できません。')
+             return
+
+        if len(ctx.message.attachments) <= 0 :
+             await ctx.send('添付ファイルがありません。1つの音声ファイル(.mp3)を添付してください。')
+             return
+
+        if len(ctx.message.attachments) >= 2 :
+             await ctx.send('添付ファイルが多すぎます。1つの音声ファイル(.mp3)を添付してください')
+             return
+
+        await ctx.send(attachment.content_type)
+        if attachment.content_type is None or attachment.content_type != 'audio/mpeg' :
+             await ctx.send('添付ファイルが音声ファイル(.mp3)ではありません。音声ファイル(.mp3)を添付してください')
+             return
+
+        filename = attachment.filename
+        tagname = filename.replace('.mp3', '')
+
+        await attachment.save("play/" + filename)
+
+        play_dict[tagname] = filename
+        np.save(PLAY_DICT_FILE, play_dict)
+        await ctx.send('音声を登録しました。 : ' + tagname + ' -> ' + filename)
+        return
+
+@bot.command()
+async def play_check(ctx, arg : str) :
+        global play_dict
+        if arg in play_dict :
+            await ctx.send('登録されています。 : ' + arg + ' -> ' + play_dict[arg])
+        else :
+            await ctx.send('登録されていません。 : ' + arg)
+
+@bot.command()
+async def play_list(ctx) :
+        global play_dict
+        str_data = json.dumps(play_dict, indent=2, ensure_ascii=False)
+        await ctx.send('音声の一覧はこちらです。\n```\n' + str_data + '\n```')
+
+@bot.command()
+async def play_rm(ctx, arg : str) :
+        global play_dict
+        if arg in play_dict :
+            target = play_dict.pop(arg)
+            np.save(PLAY_DICT_FILE, play_dict)
+            filepath = 'play/' + target
+            if os.path.isfile(filepath) :
+                os.remove(filepath) 
+
+            await ctx.send('音声を削除しました。 : ' + arg + ' -> ' + target)
+        else :
+            await ctx.send('登録されていません。 : ' + arg)
 
 bot.run(TOKEN)

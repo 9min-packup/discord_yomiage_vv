@@ -1,16 +1,18 @@
 # discord_yomiage_vv
 
-VOICEVOX と連携してチャンネルの文章を読み上げる Bot
+VOICEVOX と連携してチャンネルの文章を読み上げる Bot \
 辞書機能があります。
 
-単一の個人サーバーで運用することを想定しています。
+単一の個人サーバーで運用することを想定しています。\
 VOICEVOX と各キャラクターの規約を遵守して使用しましょう。
 
 ```
+制御
 $c  ボイスチャットに参加
 $d  ボイスチャットから切断
+$next 再生中の音声をスキップ
 
-声
+キャラクター変更
 $tumugi
 $zundamon
 $himari
@@ -29,6 +31,13 @@ $talk_add kusa 草
 $talk_list
 $talk_check kusa
 $talk_rm kusa
+
+音声ファイル
+$play ファイル名（拡張子なし）
+$play_add {ファイル添付。.mp3のみ。}
+$play_list
+$play_check ファイル名（拡張子なし）
+$play_rm ファイル名（拡張子なし）
 ```
 
 ### 導入
