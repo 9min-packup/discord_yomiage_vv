@@ -32,6 +32,11 @@ $talk_list
 $talk_check kusa
 $talk_rm kusa
 
+会話文中の特殊文字
+{dict} ... 辞書に登録された言葉
+{dict_yomi} ... 辞書に登録された言葉の読み
+{emoji} ... サーバーに登録された絵文字
+
 音声ファイル
 $play ファイル名（拡張子なし）
 $play_add {ファイル添付。.mp3のみ。}

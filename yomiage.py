@@ -330,14 +330,29 @@ async def dict_rm(ctx, arg : str) :
 
 @bot.command()
 async def talk(ctx) :
-    global talk_dict, text_channel_id
+    global word_dict, talk_dict, text_channel_id
+    EMOJI_TOKEN = '{emoji}'
+    DICT_TOKEN = '{dict}'
+    DICT_YOMI_TOKEN = '{dict_yomi}'
+
     keys = list(talk_dict.keys())
     if len(keys) <= 0 :
         await ctx.send('喋ることない')
         return
 
     key = random.choice(keys)
-    await ctx.send(talk_dict[key])
+    talk_text = talk_dict[key]
+
+    # {dict}を辞書に登録された単語（ランダム）に置換する
+    talk_text = re.sub(DICT_TOKEN, lambda match: random.choice(list(word_dict.keys())), talk_text)
+
+    # {dict_yomi}を辞書に登録された単語（ランダム）の読みに置換する
+    talk_text = re.sub(DICT_YOMI_TOKEN, lambda match: word_dict[random.choice(list(word_dict.keys()))], talk_text)
+
+    # {emoji}をランダムな絵文字に置換する
+    talk_text = re.sub(EMOJI_TOKEN, lambda match: str(random.choice(ctx.guild.emojis)), talk_text)
+
+    await ctx.send(talk_text)
     
     if voiceChannel is None :
         return
