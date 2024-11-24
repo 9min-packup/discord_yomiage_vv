@@ -358,7 +358,7 @@ async def talk(ctx) :
         return
 
     if eniaIsIn and (ctx.message.channel.id == text_channel_id) :
-        await play_voice_vox(ctx.message, '最強かわいい読み上げちゃん', '', talk_dict[key], vv_character)
+        await play_voice_vox(ctx.message, '最強かわいい読み上げちゃん', '', talk_text, vv_character)
 
 @bot.command()
 async def talk_add(ctx, arg1 : str, arg2 : str) :
