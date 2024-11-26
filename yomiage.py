@@ -44,7 +44,7 @@ intents=discord.Intents.all()
 queue_dict = defaultdict(deque)
 tokenizer = MeCab.Tagger('-Owakati')
 
-# Bot のトークン
+# config ファイルのロード
 try :
     with open(CONFIG_FILE) as f:
         config = json.load(f)
@@ -57,7 +57,6 @@ BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
 TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
 TALK_MODEL_LEN = config["talk_model_len"] if "talk_model_len" in config else TALKGEN_MODEL_LEN_DEFAULT
-
 TALKGEN_MODEL_TRIES_MIN = config["tries_min"] if "tries_min" in config else TALKGEN_MODEL_TRIES_MIN_DEFAULT
 TALKGEN_MODEL_TRIES_MAX = config["tries_max"] if "tries_max" in config else TALKGEN_MODEL_TRIES_MAX_DEFAULT
 TALKGEN_STATESIZE_MIN = config["statesize_min"] if "statesize_min" in config else TALKGEN_STATESIZE_MIN_DEFAULT
@@ -111,8 +110,7 @@ talk_dict = np.load(TALK_DICT_FILE, allow_pickle=True).item()
 # おはなし（マルコフ連鎖）機能
 if not os.path.isfile(TALKGEN_MODEL_FILE) :
     queue = deque()
-    enqueue_talkgen_model(queue, tokenizer, "こんにちは、読み上げちゃんです。")
-    enqueue_talkgen_model(queue, tokenizer, "おいしいお菓子はいかがですか？")
+    enqueue_talkgen_model(queue, tokenizer, f"こんにちは、{BOTNAME}です。")
     np.save(TALKGEN_MODEL_FILE, queue)
 talkgen_model_queue = deque(np.load(TALKGEN_MODEL_FILE, allow_pickle=True).tolist())
 
@@ -530,7 +528,7 @@ async def play_rm(ctx, arg : str) :
 
 @bot.command()
 async def talk_m(ctx) :
-    await _talk_m(ctx.message, ctx.send, tries=TALKGEN_MODEL_TRIES_MAX) 
+    await _talk_m(ctx.message, ctx.send, tries=TALKGEN_MODEL_TRIES_MIN) 
 
 async def _talk_m(message, send, state_size=None, tries=None) :
     s_size = random.randint(TALKGEN_STATESIZE_MIN, TALKGEN_STATESIZE_MAX) if state_size is None else state_size
@@ -547,7 +545,7 @@ async def _talk_m(message, send, state_size=None, tries=None) :
        return
     
     # 文章の整形
-    talk_text = ''.join(talk_text.split())
+    talk_text = talk_text_parse(talk_text)
 
     # 絵文字を復元する
     talk_text = re.sub(r':([a-zA-Z0-9_]+):', lambda m: restore_emoji(m, message.guild.emojis), talk_text)
@@ -560,5 +558,33 @@ async def _talk_m(message, send, state_size=None, tries=None) :
     if eniaIsIn and (message.channel.id == text_channel_id) :
         await play_voice_vox(message, BOTNAME_VC, '', talk_text, vv_character)
 
+def talk_text_parse(text):
+    talk_text_array = text.split()
+
+    emoji_flag = False
+    after_alphabet_flag = False
+    for i in range(len(talk_text_array)):
+        if talk_text_array[i] == ':' :
+            emoji_flag = True if not emoji_flag else False
+            after_alphabet_flag = False
+            continue
+
+        m_period = re.match(r'[.!;,\?]', talk_text_array[i])
+        if m_period:
+            if not emoji_flag:
+                talk_text_array[i] = m_period.group(0) + ' '
+            after_alphabet_flag = False
+            continue
+
+        m_alphabet_word = re.match(r'[a-zA-Z0-9-_.!~*\(\);\/?\@&=+\$,%#\"\'\`\<\>]+', talk_text_array[i])
+        if m_alphabet_word:
+            if not emoji_flag and after_alphabet_flag:
+                talk_text_array[i] = ' ' + m_alphabet_word.group(0)
+            after_alphabet_flag = True
+            continue
+
+        after_alphabet_flag = False
+
+    return ''.join(talk_text_array)
 
 bot.run(TOKEN)
