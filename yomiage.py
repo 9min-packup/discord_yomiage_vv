@@ -13,6 +13,8 @@ import numpy as np
 from collections import defaultdict, deque
 from pydub import AudioSegment
 import random
+import markovify
+import MeCab
 
 VV_TUMUGI = 8
 VV_HIMARI = 14
@@ -22,13 +24,27 @@ VV_SAYO = 46
 
 os.makedirs("out", exist_ok=True)
 os.makedirs("dict", exist_ok=True)
+os.makedirs("models", exist_ok=True)
 os.makedirs("play", exist_ok=True)
 
 CONFIG_FILE = "config.json"
 WORD_DICT_FILE = "dict/word_dict.npy"
 TALK_DICT_FILE = "dict/talk_dict.npy"
+TALKGEN_MODEL_FILE = "models/talkgen_model.npy"
 PLAY_DICT_FILE = "dict/play_dict.npy"
 
+TALKGEN_MODEL_LEN_DEFAULT = 10000
+TALKGEN_MODEL_TRIES_MIN = 10
+TALKGEN_MODEL_TRIES_MAX = 100
+TALKGEN_ERR_TEXT = 'ふぬんも'
+TALKGEN_STATESIZE_MIN = 2
+TALKGEN_STATESIZE_MAX = 6
+
+intents=discord.Intents.all()
+queue_dict = defaultdict(deque)
+tokenizer = MeCab.Tagger('-Owakati')
+
+# Bot のトークン
 try :
     with open(CONFIG_FILE) as f:
         config = json.load(f)
@@ -36,9 +52,40 @@ except FileNotFoundError:
     print(f"{CONFIG_FILE}ファイルがありません")
     exit()
 
-intents=discord.Intents.all()
+TOKEN = config['token']
+BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
+BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
+TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
+TALK_MODEL_LEN = config["talk_model_len"] if "talk_model_len" in config else TALKGEN_MODEL_LEN_DEFAULT
 
-queue_dict = defaultdict(deque)
+bot = commands.Bot(intents=intents, command_prefix='$')
+client = discord.Client(intents=intents)
+eniaIsIn = False
+
+# ボイスの種類を指定できる
+vv_character = VV_TUMUGI
+
+voiceChannel: VoiceChannel = None
+text_channel_id=-1
+
+def escape_emoji(text):
+    return re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r':\1:', text)
+
+def restore_emoji(match, emojis):
+    emoji_name = match.group(1) 
+    search_result_list = list(filter(lambda x: x.name == emoji_name, emojis))
+    if len(search_result_list) <= 0 :
+        return f':{emoji_name}:'
+
+    return str(search_result_list[0])
+
+def enqueue_talkgen_model(queue, tokenizer, text) :
+    s = escape_emoji(text)
+    queue.append(tokenizer.parse(s))
+    # len が長い場合は削る
+    while len(queue) > TALK_MODEL_LEN :
+        queue.popleft()
+    np.save(TALKGEN_MODEL_FILE, queue)
 
 #辞書機能
 if not os.path.isfile(WORD_DICT_FILE) :
@@ -52,6 +99,16 @@ if not os.path.isfile(TALK_DICT_FILE) :
     np.save(TALK_DICT_FILE, dict)
 talk_dict = np.load(TALK_DICT_FILE, allow_pickle=True).item()
 
+# おはなし（マルコフ連鎖）機能
+if not os.path.isfile(TALKGEN_MODEL_FILE) :
+    queue = deque()
+    enqueue_talkgen_model(queue, tokenizer, "こんにちは、読み上げちゃんです。")
+    enqueue_talkgen_model(queue, tokenizer, "おいしいお菓子はいかがですか？")
+    print(queue)
+    np.save(TALKGEN_MODEL_FILE, queue)
+talkgen_model_queue = deque(np.load(TALKGEN_MODEL_FILE, allow_pickle=True).tolist())
+
+# mp3 再生機能
 if not os.path.isfile(PLAY_DICT_FILE) :
     dict = {}
     np.save(PLAY_DICT_FILE, dict)
@@ -61,20 +118,6 @@ play_dict = np.load(PLAY_DICT_FILE, allow_pickle=True).item()
 fs = 24000
 seed = 4183
 count = 0
-
-# Bot のトークン
-TOKEN = config['token']
-
-bot = commands.Bot(intents=intents, command_prefix='$')
-client = discord.Client(intents=intents)
-eniaIsIn = False
-
-# ボイスの種類を指定できる
-vv_character = VV_TUMUGI
-
-voiceChannel: VoiceChannel = None
-text_channel_id=-1
-
 
 @bot.event
 async def on_ready():
@@ -101,6 +144,10 @@ async def on_message(message):
     if message.content[0] == '!' :
         return
 
+    # モデルに保存
+    enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
+    if TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
+        await _talk_m(message, message.channel.send)
     await yomiage(message, message.author.display_name, 'さん')
 
 
@@ -178,20 +225,6 @@ def play_queue(queue):
         return
     source = queue.popleft()
     voiceChannel.play(source, after=lambda e:play_queue(queue))
-
-# @bot.command()
-# async def talk_f(ctx, arg) :
-#    if ctx.author.id != KANRI_USER_ID :
-#        return
-#    channel = discord.utils.get(ctx.guild.channels, id=FREE_CHANNEL_ID)
-#    await channel.send(arg)
-
-# @bot.command()
-# async def talk_w(ctx, arg) :
-#    if ctx.author.id != KANRI_USER_ID :
-#        return
-#    channel = discord.utils.get(ctx.guild.channels, id=WORK_CHANNEL_ID)
-#    await channel.send(arg)    
 
 @bot.command()
 async def c(ctx) :
@@ -328,8 +361,16 @@ async def dict_rm(ctx, arg : str) :
         else :
             await ctx.send('辞書に登録されていません。 : ' + arg)
 
+
 @bot.command()
 async def talk(ctx) :
+    await _talk_m(ctx.message, ctx.send) 
+
+@bot.command()
+async def talk_d(ctx) :
+    await _talk_m(ctx.message, ctx.send) 
+
+async def _talk_d(message, send) :
     global word_dict, talk_dict, text_channel_id
     EMOJI_TOKEN = '{emoji}'
     DICT_TOKEN = '{dict}'
@@ -337,7 +378,7 @@ async def talk(ctx) :
 
     keys = list(talk_dict.keys())
     if len(keys) <= 0 :
-        await ctx.send('喋ることない')
+        await send('喋ることない')
         return
 
     key = random.choice(keys)
@@ -350,15 +391,15 @@ async def talk(ctx) :
     talk_text = re.sub(DICT_YOMI_TOKEN, lambda match: word_dict[random.choice(list(word_dict.keys()))], talk_text)
 
     # {emoji}をランダムな絵文字に置換する
-    talk_text = re.sub(EMOJI_TOKEN, lambda match: str(random.choice(ctx.guild.emojis)), talk_text)
+    talk_text = re.sub(EMOJI_TOKEN, lambda match: str(random.choice(message.guild.emojis)), talk_text)
 
-    await ctx.send(talk_text)
+    await send(talk_text)
     
     if voiceChannel is None :
         return
 
-    if eniaIsIn and (ctx.message.channel.id == text_channel_id) :
-        await play_voice_vox(ctx.message, '最強かわいい読み上げちゃん', '', talk_text, vv_character)
+    if eniaIsIn and (message.channel.id == text_channel_id) :
+        await play_voice_vox(message, '最強かわいい読み上げちゃん', '', talk_text, vv_character)
 
 @bot.command()
 async def talk_add(ctx, arg1 : str, arg2 : str) :
@@ -477,5 +518,38 @@ async def play_rm(ctx, arg : str) :
             await ctx.send('音声を削除しました。 : ' + arg + ' -> ' + target)
         else :
             await ctx.send('登録されていません。 : ' + arg)
+
+@bot.command()
+async def talk_m(ctx) :
+    await _talk_m(ctx.message, ctx.send) 
+
+async def _talk_m(message, send, state_size=None, tries=None) :
+    s_size = random.randint(TALKGEN_STATESIZE_MIN, TALKGEN_STATESIZE_MAX) if state_size is None else state_size
+
+    # learn model from text.
+    text_model = markovify.NewlineText(''.join(talkgen_model_queue), state_size=s_size)
+
+    t = random.randint(TALKGEN_MODEL_TRIES_MIN, TALKGEN_MODEL_TRIES_MAX) if tries is None else tries
+
+    # ... and generate from model.
+    talk_text = text_model.make_sentence(tries=t)
+    if talk_text is None : 
+       await _talk_d(message, send)
+       return
+    
+    # 文章の整形
+    talk_text = ''.join(talk_text.split())
+
+    # 絵文字を復元する
+    talk_text = re.sub(r':([a-zA-Z0-9_]+):', lambda m: restore_emoji(m, message.guild.emojis), talk_text)
+
+    await send(talk_text)
+    
+    if voiceChannel is None :
+        return
+
+    if eniaIsIn and (message.channel.id == text_channel_id) :
+        await play_voice_vox(message, BOTNAME_VC, '', talk_text, vv_character)
+
 
 bot.run(TOKEN)

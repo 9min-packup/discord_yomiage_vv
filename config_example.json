@@ -1,3 +1,7 @@
 {
-    "token": "your discord bot token"
+    "token": "your discord bot token",
+    "botname": "読み上げちゃん",
+    "botname_vc": "最強かわいい読み上げちゃん",
+    "talk_detection_re": "読み上げちゃん|読み上げさん|読み上げくん|読み上げ君",
+    "talk_model_len": 1000
 }
