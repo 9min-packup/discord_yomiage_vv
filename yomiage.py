@@ -34,11 +34,11 @@ TALKGEN_MODEL_FILE = "models/talkgen_model.npy"
 PLAY_DICT_FILE = "dict/play_dict.npy"
 
 TALKGEN_MODEL_LEN_DEFAULT = 10000
-TALKGEN_MODEL_TRIES_MIN = 10
-TALKGEN_MODEL_TRIES_MAX = 100
+TALKGEN_MODEL_TRIES_MIN_DEFAULT = 10
+TALKGEN_MODEL_TRIES_MAX_DEFAULT = 100
 TALKGEN_ERR_TEXT = 'ふぬんも'
-TALKGEN_STATESIZE_MIN = 2
-TALKGEN_STATESIZE_MAX = 6
+TALKGEN_STATESIZE_MIN_DEFAULT = 2
+TALKGEN_STATESIZE_MAX_DEFAULT = 6
 
 intents=discord.Intents.all()
 queue_dict = defaultdict(deque)
@@ -57,6 +57,12 @@ BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
 TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
 TALK_MODEL_LEN = config["talk_model_len"] if "talk_model_len" in config else TALKGEN_MODEL_LEN_DEFAULT
+
+TALKGEN_MODEL_TRIES_MIN = config["tries_min"] if "tries_min" in config else TALKGEN_MODEL_TRIES_MIN_DEFAULT
+TALKGEN_MODEL_TRIES_MAX = config["tries_max"] if "tries_max" in config else TALKGEN_MODEL_TRIES_MAX_DEFAULT
+TALKGEN_STATESIZE_MIN = config["statesize_min"] if "statesize_min" in config else TALKGEN_STATESIZE_MIN_DEFAULT
+TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config else TALKGEN_STATESIZE_MAX_DEFAULT
+
 
 bot = commands.Bot(intents=intents, command_prefix='$')
 client = discord.Client(intents=intents)
@@ -150,7 +156,7 @@ async def on_message(message):
     enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
     if TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
         await _talk_m(message, message.channel.send)
-    print(talkgen_model_queue)
+
     await yomiage(message, message.author.display_name, 'さん')
 
 
@@ -371,7 +377,7 @@ async def talk(ctx) :
 
 @bot.command()
 async def talk_d(ctx) :
-    await _talk_m(ctx.message, ctx.send) 
+    await _talk_d(ctx.message, ctx.send) 
 
 async def _talk_d(message, send) :
     global word_dict, talk_dict, text_channel_id
@@ -524,7 +530,7 @@ async def play_rm(ctx, arg : str) :
 
 @bot.command()
 async def talk_m(ctx) :
-    await _talk_m(ctx.message, ctx.send) 
+    await _talk_m(ctx.message, ctx.send, tries=TALKGEN_MODEL_TRIES_MAX) 
 
 async def _talk_m(message, send, state_size=None, tries=None) :
     s_size = random.randint(TALKGEN_STATESIZE_MIN, TALKGEN_STATESIZE_MAX) if state_size is None else state_size
