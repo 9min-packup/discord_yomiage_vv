@@ -1,6 +1,6 @@
 # 最強かわいい読み上げちゃん Bot
 
-![screenchot](screenchot.png)
+![screenshot](assets/screenshot.png)
 
 VOICEVOX と連携して Discord チャンネルの文章を読み上げる Bot。以下の機能があります。
 
