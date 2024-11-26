@@ -5,3 +5,4 @@ models/*
 config.json
 **/__pycache__
 **/__pycache__/**
+learned_data.json
