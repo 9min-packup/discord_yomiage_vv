@@ -15,6 +15,7 @@ from pydub import AudioSegment
 import random
 import markovify
 import MeCab
+from datetime import datetime, timedelta
 
 VV_TUMUGI = 8
 VV_HIMARI = 14
@@ -93,7 +94,6 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
-    np.save(TALKGEN_MODEL_FILE, queue)
 
 #辞書機能
 if not os.path.isfile(WORD_DICT_FILE) :
@@ -110,7 +110,6 @@ talk_dict = np.load(TALK_DICT_FILE, allow_pickle=True).item()
 # おはなし（マルコフ連鎖）機能
 if not os.path.isfile(TALKGEN_MODEL_FILE) :
     queue = deque()
-    enqueue_talkgen_model(queue, tokenizer, f"こんにちは、{BOTNAME}です。")
     np.save(TALKGEN_MODEL_FILE, queue)
 talkgen_model_queue = deque(np.load(TALKGEN_MODEL_FILE, allow_pickle=True).tolist())
 
@@ -152,6 +151,7 @@ async def on_message(message):
 
     # モデルに保存
     enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
+    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
     if TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
         await _talk_m(message, message.channel.send)
 
@@ -531,6 +531,10 @@ async def talk_m(ctx) :
     await _talk_m(ctx.message, ctx.send, tries=TALKGEN_MODEL_TRIES_MIN) 
 
 async def _talk_m(message, send, state_size=None, tries=None) :
+    if len(talkgen_model_queue) <= 0 :
+        await _talk_d(message, send)
+        return
+
     s_size = random.randint(TALKGEN_STATESIZE_MIN, TALKGEN_STATESIZE_MAX) if state_size is None else state_size
 
     # learn model from text.
@@ -576,7 +580,7 @@ def talk_text_parse(text):
             after_alphabet_flag = False
             continue
 
-        m_alphabet_word = re.match(r'[a-zA-Z0-9-_.!~*\(\);\/?\@&=+\$,%#\"\'\`\<\>]+', talk_text_array[i])
+        m_alphabet_word = re.match(r'[a-zA-Z0-9-_.!~*\(\);?\@&=+\$,%#\"\'\`\<\>]+', talk_text_array[i])
         if m_alphabet_word:
             if not emoji_flag and after_alphabet_flag:
                 talk_text_array[i] = ' ' + m_alphabet_word.group(0)
@@ -586,5 +590,36 @@ def talk_text_parse(text):
         after_alphabet_flag = False
 
     return ''.join(talk_text_array)
+
+@bot.command()
+async def learn_history(ctx, arg : str) :
+    limit = int(arg)
+    limit = limit if limit else 0
+    limit = limit if limit >= 0 else 0
+    limit = limit if limit <= TALK_MODEL_LEN else TALK_MODEL_LEN
+    async for message in ctx.channel.history(
+        limit=limit,
+        oldest_first=True,
+    ):
+        if message.author.bot:
+            continue
+        if len(message.content) <= 0 :
+            continue
+        if message.content[0] == '$' :
+            continue
+        if message.content[0] == '/' :
+            continue
+        if message.content[0] == '!' :
+            continue
+        enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
+    
+    np.save(TALKGEN_MODEL_FILE, enqueue_talkgen_model)
+    await ctx.message.add_reaction('👍')
+
+@bot.command()
+async def learn_forget(ctx) :
+    talkgen_model_queue = deque()
+    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
+    await ctx.message.add_reaction('👍')
 
 bot.run(TOKEN)
