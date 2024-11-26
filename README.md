@@ -1,10 +1,19 @@
-# discord_yomiage_vv
+# 最強かわいい読み上げちゃん Bot
 
-VOICEVOX と連携してチャンネルの文章を読み上げる Bot \
-辞書機能があります。
+![screenchot](screenchot.png)
+
+VOICEVOX と連携して Discord チャンネルの文章を読み上げる Bot。以下の機能があります。
+
+-   テキストチャットの文章読み上げ
+-   単語辞書
+-   会話文辞書によるおしゃべり
+-   マルコフ連鎖によるおしゃべり
+-   mp3 ファイルの登録と再生
 
 単一の個人サーバーで運用することを想定しています。\
 VOICEVOX と各キャラクターの規約を遵守して使用しましょう。
+
+### コマンド一覧
 
 ```
 制御
@@ -60,10 +69,9 @@ $play_check ファイル名（拡張子なし）
 $play_rm ファイル名（拡張子なし）
 ```
 
-### 導入
-
 python のバージョンは 3.12 です。 \
-実行には MeCab などが必要です
+
+### MeCab 導入
 
 MeCab のインストール
 
@@ -137,13 +145,16 @@ $ sudo apt-get install nkf
 $ /usr/lib/mecab/mecab-dict-index
 ```
 
+### 導入
+
 1. requirements を pip インストール
 2. VOICEVOX の vv-engine を起動（サービスに登録したほうがいい）
 3. config_exapmle.json を config.json にリネーム
 4. config.json 内に discord bot のトークンを記載
 5. yomiage.py を実行　（これもサービスに登録したほうがいいです）
 
-参考 \
+### 参考
+
 https://qiita.com/kado_u/items/e736600f8d295afb8bd9 \
 https://qiita.com/kakakaya/items/38042e807f3410b88b2d \
 https://atmarkit.itmedia.co.jp/ait/articles/2102/19/news026.html
