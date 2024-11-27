@@ -37,7 +37,7 @@ PLAY_DICT_FILE = "dict/play_dict.npy"
 TALKGEN_MODEL_LEN_DEFAULT = 10000
 TALKGEN_MODEL_TRIES_MIN_DEFAULT = 10
 TALKGEN_MODEL_TRIES_MAX_DEFAULT = 100
-TALKGEN_ERR_TEXT = 'ふぬんも'
+TALKGEN_FAILURE_TEXT = '喋ることない'
 TALKGEN_STATESIZE_MIN_DEFAULT = 2
 TALKGEN_STATESIZE_MAX_DEFAULT = 6
 
@@ -157,13 +157,15 @@ async def on_message(message):
     # モデルに保存
     enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
+
+    # 読み上げる
+    await yomiage(message, message.author.display_name, 'さん')
+
     # 反応してお喋りする
     if bot.user in message.mentions :
         await _talk_m(message, message.reply)
     elif TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
         await _talk_m(message, message.channel.send)
-
-    await yomiage(message, message.author.display_name, 'さん')
 
 async def yomiage(message, username, keisyou)  :
     if eniaIsIn and (message.channel.id == text_channel_id) :
@@ -393,7 +395,7 @@ async def _talk_d(message, send) :
 
     keys = list(talk_dict.keys())
     if len(keys) <= 0 :
-        await send('喋ることない')
+        await send(TALKGEN_FAILURE_TEXT)
         return
 
     key = random.choice(keys)
@@ -414,7 +416,7 @@ async def _talk_d(message, send) :
         return
 
     if eniaIsIn and (message.channel.id == text_channel_id) :
-        await play_voice_vox(message, '最強かわいい読み上げちゃん', '', talk_text, vv_character)
+        await play_voice_vox(message, BOTNAME_VC, '', talk_text, vv_character)
 
 @bot.command()
 async def talk_add(ctx, arg1 : str, arg2 : str) :
