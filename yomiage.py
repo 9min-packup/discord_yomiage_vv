@@ -64,6 +64,10 @@ TALKGEN_MODEL_TRIES_MAX = config["tries_max"] if "tries_max" in config else TALK
 TALKGEN_STATESIZE_MIN = config["statesize_min"] if "statesize_min" in config else TALKGEN_STATESIZE_MIN_DEFAULT
 TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config else TALKGEN_STATESIZE_MAX_DEFAULT
 
+# 正規表現のメタ文字をエスケープ
+COMMAND_PREFIX_ESCAPED = re.sub(r'([\*|\\|\.|\+|\?|\{|\}|\(|\)|\[|\]|\^|\$|\|])', r'\\\1', COMMAND_PREFIX)
+print(COMMAND_PREFIX)
+print(COMMAND_PREFIX_ESCAPED)
 
 bot = commands.Bot(intents=intents, command_prefix=COMMAND_PREFIX)
 client = discord.Client(intents=intents)
@@ -140,7 +144,7 @@ async def on_message(message):
     if len(message.content) <= 0 :
         return
 
-    if re.match(f'{COMMAND_PREFIX}.*', message.content):
+    if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content):
         await bot.process_commands(message)
         return
 
