@@ -613,11 +613,12 @@ async def learn_history(ctx, arg : str) :
             continue
         enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
     
-    np.save(TALKGEN_MODEL_FILE, enqueue_talkgen_model)
+    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
     await ctx.message.add_reaction('👍')
 
 @bot.command()
 async def learn_forget(ctx) :
+    global talkgen_model_queue
     talkgen_model_queue = deque()
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
     await ctx.message.add_reaction('👍')
