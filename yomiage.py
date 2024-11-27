@@ -55,6 +55,13 @@ except FileNotFoundError:
 
 TOKEN = config['token']
 COMMAND_PREFIX = config["command_prefix"] if "command_prefix" in config else "$"
+TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config else TALKGEN_STATESIZE_MAX_DEFAULT
+ADMIN_USER_ID_LIST = config["admin_user_id_list"] if "admin_user_id_list" in config else []
+for i in range(0 ,len(ADMIN_USER_ID_LIST)): 
+    if type(ADMIN_USER_ID_LIST[i]) is str :
+        ADMIN_USER_ID_LIST[i] = int(ADMIN_USER_ID_LIST[i])
+
+    
 BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
 TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
@@ -242,6 +249,11 @@ def play_queue(queue):
         return
     source = queue.popleft()
     voiceChannel.play(source, after=lambda e:play_queue(queue))
+
+def check_admin(user_id, admin_user_id_list):
+    if user_id in admin_user_id_list:
+        return True
+    return False
 
 @bot.command()
 async def c(ctx) :
@@ -603,6 +615,11 @@ def talk_text_parse(text):
 
 @bot.command()
 async def learn_history(ctx, arg : str) :
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
     limit = int(arg)
     limit = limit if limit else 0
     limit = limit if limit >= 0 else 0
@@ -630,6 +647,11 @@ async def learn_history(ctx, arg : str) :
 
 @bot.command()
 async def learn_forget(ctx) :
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
     global talkgen_model_queue
     talkgen_model_queue = deque()
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)

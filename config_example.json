@@ -1,6 +1,7 @@
 {
     "token": "your discord bot token",
     "command_prefix": "$",
+    "admin_user_ids": ["your user_id (int)"],
     "botname": "読み上げちゃん",
     "botname_vc": "最強かわいい読み上げちゃん",
     "talk_detection_re": "読み上げちゃん|読み上げさん|読み上げくん|読み上げ君",
