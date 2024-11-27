@@ -142,11 +142,11 @@ async def on_message(message):
     if len(message.content) <= 0 :
         return
 
-    if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content):
-        await bot.process_commands(message)
+    if message.content[0] == '/' :
         return
 
-    if message.content[0] == '/' :
+    if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content):
+        await bot.process_commands(message)
         return
 
     # モデルに保存
@@ -605,14 +605,16 @@ async def learn_history(ctx, arg : str) :
     ):
         if message.author.bot:
             continue
+
         if len(message.content) <= 0 :
             continue
-        if message.content[0] == '$' :
-            continue
+
         if message.content[0] == '/' :
             continue
-        if message.content[0] == '!' :
+
+        if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content) :
             continue
+
         enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
     
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
