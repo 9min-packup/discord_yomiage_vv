@@ -13,8 +13,6 @@ VOICEVOX と連携して Discord チャンネルの文章を読み上げる Bot�
 単一の個人サーバーで運用することを想定しています。\
 VOICEVOX と各キャラクターの規約を遵守して使用しましょう。
 
-マルコフ連鎖によるおしゃべり機能を除いた `yomiage_except_markovify.py` を同梱しています。MeCab 等の導入をしたくない場合に使用してください。
-
 ### コマンド一覧
 
 ```
@@ -86,10 +84,6 @@ python のバージョンは 3.12 です。
 <br>
 
 ### MeCab 導入
-
-マルコフ連鎖によるおしゃべり機能を除いた `yomiage_except_markovify.py` を使用する場合は不要です。
-
-<br>
 
 MeCab のインストール
 
@@ -183,7 +177,7 @@ $ /usr/lib/mecab/mecab-dict-index
 2. VOICEVOX の vv-engine を起動（サービスに登録したほうがいい）
 3. config_exapmle.json を config.json にリネーム
 4. config.json 内に discord bot のトークンを記載
-5. `yomiage.py`または`yomiage_except_markovify.py`を実行　（これもサービスに登録したほうがいいです）
+5. `yomiage.py`を実行　（これもサービスに登録したほうがいいです）
 
 <br>
 
