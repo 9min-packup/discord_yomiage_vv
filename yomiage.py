@@ -83,6 +83,9 @@ def escape_emoji(text):
 def remove_mention(text):
     return re.sub(r'<@[-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+>', '', text)
 
+def remove_url(text):
+    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
+
 def restore_emoji(match, emojis):
     emoji_name = match.group(1) 
     search_result_list = list(filter(lambda x: x.name == emoji_name, emojis))
@@ -92,11 +95,12 @@ def restore_emoji(match, emojis):
     return str(search_result_list[0])
 
 def enqueue_talkgen_model(queue, tokenizer, text) :
-    s = escape_emoji(remove_mention(text))
+    s = escape_emoji(remove_url(remove_mention(text)))
     queue.append(tokenizer.parse(s))
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
+    print(queue)
 
 #辞書機能
 if not os.path.isfile(WORD_DICT_FILE) :
