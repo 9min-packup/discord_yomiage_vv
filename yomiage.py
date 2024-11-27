@@ -96,6 +96,8 @@ def restore_emoji(match, emojis):
 
 def enqueue_talkgen_model(queue, tokenizer, text) :
     s = escape_emoji(remove_url(remove_mention_channel(text)))
+    if len(s) <= 0 or re.fullmatch(r'[ 　]*', s) :
+        return
     queue.append(tokenizer.parse(s))
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
