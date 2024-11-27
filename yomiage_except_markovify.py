@@ -14,6 +14,7 @@ from collections import defaultdict, deque
 from pydub import AudioSegment
 import random
 
+
 VV_TUMUGI = 8
 VV_HIMARI = 14
 VV_ZUNDAMOM = 3 
@@ -60,6 +61,8 @@ for i in range(0 ,len(ADMIN_USER_ID_LIST)):
     
 BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
+VOICE_SPEED_SCALE = config["voice_speed_scale"] if "voice_speed_scale" in config else 1.0
+VOICE_SPEED_SCALE_MARGIN = config["voice_speed_scale_margin"] if "voice_speed_scale_margin" in config else TALKGEN_MODEL_LEN_DEFAULT
 TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
 TALK_MODEL_LEN = config["talk_model_len"] if "talk_model_len" in config else TALKGEN_MODEL_LEN_DEFAULT
 TALKGEN_MODEL_TRIES_MIN = config["tries_min"] if "tries_min" in config else TALKGEN_MODEL_TRIES_MIN_DEFAULT
@@ -178,7 +181,8 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
     args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r' \1 ', remove_mention_channel(args['text']))
 
 
-    if len(args['text']) >= 100 :
+    #文字数が多い時は省略 & 読むスピードを上げる。
+    if len(args['text']) >= 140 :
         args['text'] = args['text'][:140] + ' いかりゃく '
 
     host = 'localhost'

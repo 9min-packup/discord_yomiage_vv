@@ -16,6 +16,7 @@ import random
 import markovify
 import MeCab
 
+
 VV_TUMUGI = 8
 VV_HIMARI = 14
 VV_ZUNDAMOM = 3 
@@ -32,6 +33,8 @@ WORD_DICT_FILE = "dict/word_dict.npy"
 TALK_DICT_FILE = "dict/talk_dict.npy"
 TALKGEN_MODEL_FILE = "models/talkgen_model.npy"
 PLAY_DICT_FILE = "dict/play_dict.npy"
+
+VOICE_TEXT_LEN_MAX = 140
 
 TALKGEN_MODEL_LEN_DEFAULT = 10000
 TALKGEN_MODEL_TRIES_MIN_DEFAULT = 10
@@ -63,6 +66,7 @@ for i in range(0 ,len(ADMIN_USER_ID_LIST)):
     
 BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
+
 TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
 TALK_MODEL_LEN = config["talk_model_len"] if "talk_model_len" in config else TALKGEN_MODEL_LEN_DEFAULT
 TALKGEN_MODEL_TRIES_MIN = config["tries_min"] if "tries_min" in config else TALKGEN_MODEL_TRIES_MIN_DEFAULT
@@ -72,6 +76,12 @@ TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config els
 
 # 正規表現のメタ文字をエスケープ
 COMMAND_PREFIX_ESCAPED = re.sub(r'([\*|\\|\.|\+|\?|\{|\}|\(|\)|\[|\]|\^|\$|\|])', r'\\\1', COMMAND_PREFIX)
+
+# 再生まわりの設定
+voice_speed_scale = config["voice_speed_scale"] if "voice_speed_scale" in config else 1.0
+voice_speed_scale_margin = config["voice_speed_scale_margin"] if "voice_speed_scale_margin" in config else 5.0
+voice_speed_pitch = config["voice_speed_pitch"] if "voice_speed_pitch" in config else 0.0
+
 
 bot = commands.Bot(intents=intents, command_prefix=COMMAND_PREFIX)
 client = discord.Client(intents=intents)
@@ -188,6 +198,7 @@ def word_replace(args) :
 async def play_voice_vox(message, user, keisyou, text, speaker):
     global count, client
     global voiceChannel
+    global voice_speed_scale, voice_speed_scale_margin
 
     if voiceChannel is None :
         return 
@@ -199,26 +210,35 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
     word_replace(args)
     args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r' \1 ', remove_mention_channel(args['text']))
 
+    #文字数が多い時は省略
+    if len(args['text']) >= (VOICE_TEXT_LEN_MAX - 7 ) :
+        args['text'] = args['text'][:(VOICE_TEXT_LEN_MAX - 7 )] + ' いかりゃく '
 
-    if len(args['text']) >= 100 :
-        args['text'] = args['text'][:140] + ' いかりゃく '
+
+    #文字数が多い時は読むスピードを速くする（二次関数）
+    speed_s = voice_speed_scale
+    n = len(args['text']) / VOICE_TEXT_LEN_MAX
+    speed_s = (n * voice_speed_scale_margin) + voice_speed_scale
 
     host = 'localhost'
     port = 50021
     params = (
         ('text', '' + args['user'] + keisyou + '、    ' +  args['text']),
-        ('speaker', speaker),
+        ('speaker', speaker)
     )
     response1 = requests.post(
         f'http://{host}:{port}/audio_query',
         params=params
     )
+    query_data = response1.json()
+    query_data["speedScale"] = speed_s
+    query_data["pitchScale"] = voice_speed_pitch
     headers = {'Content-Type': 'application/json',}
     response2 = requests.post(
         f'http://{host}:{port}/synthesis',
         headers=headers,
         params=params,
-        data=json.dumps(response1.json())
+        data=json.dumps(query_data)
     )
     wav_a = AudioSegment(
         data=response2.content,
@@ -654,6 +674,25 @@ async def learn_forget(ctx) :
     global talkgen_model_queue
     talkgen_model_queue = deque()
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
+    await ctx.message.add_reaction('👍')
+
+
+@bot.command()
+async def set_speed(ctx, arg : str) :
+    global voice_speed_scale
+    voice_speed_scale = float(arg)
+    await ctx.message.add_reaction('👍')
+
+@bot.command()
+async def set_speed_margin(ctx, arg : str) :
+    global voice_speed_scale_margin
+    voice_speed_scale_margin = float(arg)
+    await ctx.message.add_reaction('👍')
+
+@bot.command()
+async def set_pitch(ctx, arg : str) :
+    global voice_speed_pitch
+    voice_speed_pitch = float(arg)
     await ctx.message.add_reaction('👍')
 
 bot.run(TOKEN)
