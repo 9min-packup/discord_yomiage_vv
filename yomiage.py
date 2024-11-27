@@ -80,8 +80,8 @@ text_channel_id=-1
 def escape_emoji(text):
     return re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r':\1:', text)
 
-def remove_mention(text):
-    return re.sub(r'<@[-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+>', '', text)
+def remove_mention_channel(text):
+    return re.sub(r'<[@|#][-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+>', '', text)
 
 def remove_url(text):
     return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
@@ -95,12 +95,11 @@ def restore_emoji(match, emojis):
     return str(search_result_list[0])
 
 def enqueue_talkgen_model(queue, tokenizer, text) :
-    s = escape_emoji(remove_url(remove_mention(text)))
+    s = escape_emoji(remove_url(remove_mention_channel(text)))
     queue.append(tokenizer.parse(s))
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
-    print(queue)
 
 #辞書機能
 if not os.path.isfile(WORD_DICT_FILE) :
@@ -188,7 +187,8 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
     s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
     args = { 'user' : user, 'text' : s }
     word_replace(args)
-    args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r' \1 ', args['text'])
+    args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r' \1 ', remove_mention_channel(args['text']))
+
 
     if len(args['text']) >= 100 :
         args['text'] = args['text'][:140] + ' いかりゃく '
