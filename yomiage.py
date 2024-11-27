@@ -54,6 +54,7 @@ except FileNotFoundError:
     exit()
 
 TOKEN = config['token']
+COMMAND_PREFIX = config["command_prefix"] if "command_prefix" in config else "$"
 BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
 TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
@@ -64,7 +65,7 @@ TALKGEN_STATESIZE_MIN = config["statesize_min"] if "statesize_min" in config els
 TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config else TALKGEN_STATESIZE_MAX_DEFAULT
 
 
-bot = commands.Bot(intents=intents, command_prefix='$')
+bot = commands.Bot(intents=intents, command_prefix=COMMAND_PREFIX)
 client = discord.Client(intents=intents)
 eniaIsIn = False
 
@@ -139,14 +140,11 @@ async def on_message(message):
     if len(message.content) <= 0 :
         return
 
-    if message.content[0] == '$' :
+    if re.match(f'{COMMAND_PREFIX}.*', message.content):
         await bot.process_commands(message)
         return
 
     if message.content[0] == '/' :
-        return
-
-    if message.content[0] == '!' :
         return
 
     # モデルに保存

@@ -1,11 +1,12 @@
 {
     "token": "your discord bot token",
+    "command_prefix": "$",
     "botname": "読み上げちゃん",
     "botname_vc": "最強かわいい読み上げちゃん",
     "talk_detection_re": "読み上げちゃん|読み上げさん|読み上げくん|読み上げ君",
     "talk_model_len": 1000,
-    "tries_min": 10,
-    "tries_max": 100,
+    "tries_min": 100,
+    "tries_max": 500,
     "statesize_min": 2,
     "statesize_max": 6
 }
