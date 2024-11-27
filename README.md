@@ -13,6 +13,8 @@ VOICEVOX と連携して Discord チャンネルの文章を読み上げる Bot�
 単一の個人サーバーで運用することを想定しています。\
 VOICEVOX と各キャラクターの規約を遵守して使用しましょう。
 
+マルコフ連鎖によるおしゃべり機能を除いた `yomiage_except_markovify.py` を同梱しています。MeCab 等の導入をしたくない場合に使用してください。
+
 ### コマンド一覧
 
 ```
@@ -34,9 +36,13 @@ $dict_list
 $dict_check 肉
 $dict_rm 肉
 
-会話
-名前を呼んでも反応します。
+会話（マルコフ連鎖）
+名前を呼ぶかメンションをしても反応します。
 $talk
+または
+$talk_m
+
+マルコフ連鎖による文章生成はある程度学習が進むとうまくいくようになります。失敗した時は辞書を参照します。
 
 会話（辞書）
 $talk_d
@@ -45,16 +51,11 @@ $talk_list
 $talk_check kusa
 $talk_rm kusa
 
-会話（マルコフ連鎖）
-$talk_m
-
-チャンネルの履歴から学習する
+チャンネルの履歴から学習する（admin権限が必要です）
 $learn_history {整数(メッセージの数)}
 
-学習結果を忘れる
+学習結果を忘れる（admin権限が必要です）
 $learn_forget
-
-マルコフ連鎖による文章生成はある程度学習が進むとうまくいくようになります。失敗した時は辞書による生成を行います。
 
 会話文中の特殊文字
 {dict} ... 辞書に登録された言葉
@@ -69,9 +70,18 @@ $play_check ファイル名（拡張子なし）
 $play_rm ファイル名（拡張子なし）
 ```
 
-python のバージョンは 3.12 です。 \
+<br>
+
+Ubunto 22.04LTS で動作確認。 \
+python のバージョンは 3.12 です。
+
+<br>
 
 ### MeCab 導入
+
+マルコフ連鎖によるおしゃべり機能を除いた `yomiage_except_markovify.py` を使用する場合は不要です。
+
+<br>
 
 MeCab のインストール
 
@@ -81,8 +91,10 @@ $ sudo apt install libmecab-dev
 $ sudo apt install mecab-ipadic-utf8
 ```
 
-\
+<br>
+
 mecab-ipadic-neologd（辞書）のインストール
+
 https://github.com/neologd/mecab-ipadic-neologd/blob/master/README.ja.md
 
 ```
@@ -91,11 +103,15 @@ $ cd mecab-ipadic-neologd
 $ sudo bin/install-mecab-ipadic-neologd
 ```
 
+<br>
+
 mecab-ipadic-neologd の移動
 
 ```
 $ sudo mv /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd /var/lib/mecab/dic
 ```
+
+<br>
 
 MeCab の辞書の設定がまだ ipadic になっているので変更する
 
@@ -117,6 +133,8 @@ dicdir = /var/lib/mecab/dic/mecab-ipadic-neologd ⇐ 一行追加
 ; eos-format = EOS\n
 ```
 
+<br>
+
 Python に導入
 
 ```
@@ -124,11 +142,15 @@ $ pip install mecab-python3
 $ pip install markovify
 ```
 
+<br>
+
 mecabrc へのシンボリックリンクを作成
 
 ```
 $ sudo ln -s /etc/mecabrc /usr/local/etc/mecabrc
 ```
+
+<br>
 
 必要であればユーザー辞書を作成する
 https://taku910.github.io/mecab/dic.html
@@ -145,13 +167,48 @@ $ sudo apt-get install nkf
 $ /usr/lib/mecab/mecab-dict-index
 ```
 
+<br>
+
 ### 導入
 
 1. requirements を pip インストール
 2. VOICEVOX の vv-engine を起動（サービスに登録したほうがいい）
 3. config_exapmle.json を config.json にリネーム
 4. config.json 内に discord bot のトークンを記載
-5. yomiage.py を実行　（これもサービスに登録したほうがいいです）
+5. `yomiage.py`または`yomiage_except_markovify.py`を実行　（これもサービスに登録したほうがいいです）
+
+<br>
+
+補足: VOICEVOX の導入
+
+以下の URL からダウンロードして解凍する。
+
+```
+wget https://github.com/VOICEVOX/voicevox/releases/download/0.21.1/voicevox-linux-cpu-0.21.1.tar.gz
+tar xvzf voicevox-linux-cpu-0.21.1.tar.gz
+```
+
+手動でダウンロードしてインストールしてもいい。バージョンが更新されていることがあるので公式サイトを確認すること。 \
+https://voicevox.hiroshiba.jp/
+
+<br>
+
+解凍したフォルダ内の `vv-engine/run` を実行する
+
+```
+cd VOICEVOX
+./vv-engine/run
+```
+
+<br>
+
+補足: サービスの登録
+
+以下の記事が参考になります。
+https://pyopyopyo.hatenablog.com/entry/2021/04/30/233755 \
+https://yuukou-exp.plus/ubuntu-register-my-service-to-system/
+
+<br>
 
 ### 参考
 

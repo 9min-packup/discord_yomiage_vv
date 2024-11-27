@@ -13,8 +13,6 @@ import numpy as np
 from collections import defaultdict, deque
 from pydub import AudioSegment
 import random
-import markovify
-import MeCab
 
 VV_TUMUGI = 8
 VV_HIMARI = 14
@@ -42,7 +40,6 @@ TALKGEN_STATESIZE_MAX_DEFAULT = 6
 
 intents=discord.Intents.all()
 queue_dict = defaultdict(deque)
-tokenizer = MeCab.Tagger('-Owakati')
 
 # config ファイルのロード
 try :
@@ -100,15 +97,6 @@ def restore_emoji(match, emojis):
 
     return str(search_result_list[0])
 
-def enqueue_talkgen_model(queue, tokenizer, text) :
-    s = escape_emoji(remove_url(remove_mention_channel(text)))
-    if len(s) <= 0 or re.fullmatch(r'[ 　]*', s) :
-        return
-    queue.append(tokenizer.parse(s))
-    # len が長い場合は削る
-    while len(queue) > TALK_MODEL_LEN :
-        queue.popleft()
-
 #辞書機能
 if not os.path.isfile(WORD_DICT_FILE) :
     dict = {}
@@ -120,12 +108,6 @@ if not os.path.isfile(TALK_DICT_FILE) :
     dict = {}
     np.save(TALK_DICT_FILE, dict)
 talk_dict = np.load(TALK_DICT_FILE, allow_pickle=True).item()
-
-# おはなし（マルコフ連鎖）機能
-if not os.path.isfile(TALKGEN_MODEL_FILE) :
-    queue = deque()
-    np.save(TALKGEN_MODEL_FILE, queue)
-talkgen_model_queue = deque(np.load(TALKGEN_MODEL_FILE, allow_pickle=True).tolist())
 
 # mp3 再生機能
 if not os.path.isfile(PLAY_DICT_FILE) :
@@ -160,18 +142,14 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # モデルに保存
-    enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
-    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
-
     # 読み上げる
     await yomiage(message, message.author.display_name, 'さん')
 
     # 反応してお喋りする
     if bot.user in message.mentions :
-        await _talk_m(message, message.reply)
+        await _talk_d(message, message.reply)
     elif TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
-        await _talk_m(message, message.channel.send)
+        await _talk_d(message, message.channel.send)
 
 async def yomiage(message, username, keisyou)  :
     if eniaIsIn and (message.channel.id == text_channel_id) :
@@ -392,7 +370,7 @@ async def dict_rm(ctx, arg : str) :
 
 @bot.command()
 async def talk(ctx) :
-    await _talk_m(ctx.message, ctx.send) 
+    await _talk_d(ctx.message, ctx.send) 
 
 @bot.command()
 async def talk_d(ctx) :
@@ -547,113 +525,5 @@ async def play_rm(ctx, arg : str) :
         else :
             await ctx.send('登録されていません。 : ' + arg)
 
-@bot.command()
-async def talk_m(ctx) :
-    await _talk_m(ctx.message, ctx.send, tries=TALKGEN_MODEL_TRIES_MIN) 
-
-async def _talk_m(message, send, state_size=None, tries=None) :
-    if len(talkgen_model_queue) <= 0 :
-        await _talk_d(message, send)
-        return
-
-    s_size = random.randint(TALKGEN_STATESIZE_MIN, TALKGEN_STATESIZE_MAX) if state_size is None else state_size
-
-    # learn model from text.
-    text_model = markovify.NewlineText(''.join(talkgen_model_queue), state_size=s_size)
-
-    t = random.randint(TALKGEN_MODEL_TRIES_MIN, TALKGEN_MODEL_TRIES_MAX) if tries is None else tries
-
-    # ... and generate from model.
-    talk_text = text_model.make_sentence(tries=t)
-    if talk_text is None : 
-       await _talk_d(message, send)
-       return
-    
-    # 文章の整形
-    talk_text = talk_text_parse(talk_text)
-
-    # 絵文字を復元する
-    talk_text = re.sub(r':([a-zA-Z0-9_]+):', lambda m: restore_emoji(m, message.guild.emojis), talk_text)
-
-    await send(talk_text)
-    
-    if voiceChannel is None :
-        return
-
-    if eniaIsIn and (message.channel.id == text_channel_id) :
-        await play_voice_vox(message, BOTNAME_VC, '', talk_text, vv_character)
-
-def talk_text_parse(text):
-    talk_text_array = text.split()
-
-    emoji_flag = False
-    after_alphabet_flag = False
-    for i in range(len(talk_text_array)):
-        if talk_text_array[i] == ':' :
-            emoji_flag = True if not emoji_flag else False
-            after_alphabet_flag = False
-            continue
-
-        m_period = re.match(r'[.!;,\?]', talk_text_array[i])
-        if m_period:
-            if not emoji_flag:
-                talk_text_array[i] = m_period.group(0) + ' '
-            after_alphabet_flag = False
-            continue
-
-        m_alphabet_word = re.match(r'[a-zA-Z0-9-_.!~*\(\);?\@&=+\$,%#\"\'\`\<\>]+', talk_text_array[i])
-        if m_alphabet_word:
-            if not emoji_flag and after_alphabet_flag:
-                talk_text_array[i] = ' ' + m_alphabet_word.group(0)
-            after_alphabet_flag = True
-            continue
-
-        after_alphabet_flag = False
-
-    return ''.join(talk_text_array)
-
-@bot.command()
-async def learn_history(ctx, arg : str) :
-    # admin 権限が必要
-    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
-        await ctx.message.add_reaction('💤')
-        return
-
-    limit = int(arg)
-    limit = limit if limit else 0
-    limit = limit if limit >= 0 else 0
-    limit = limit if limit <= TALK_MODEL_LEN else TALK_MODEL_LEN
-    async for message in ctx.channel.history(
-        limit=limit,
-        oldest_first=True,
-    ):
-        if message.author.bot:
-            continue
-
-        if len(message.content) <= 0 :
-            continue
-
-        if message.content[0] == '/' :
-            continue
-
-        if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content) :
-            continue
-
-        enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
-    
-    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
-    await ctx.message.add_reaction('👍')
-
-@bot.command()
-async def learn_forget(ctx) :
-    # admin 権限が必要
-    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
-        await ctx.message.add_reaction('💤')
-        return
-
-    global talkgen_model_queue
-    talkgen_model_queue = deque()
-    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
-    await ctx.message.add_reaction('👍')
 
 bot.run(TOKEN)
