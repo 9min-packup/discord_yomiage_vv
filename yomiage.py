@@ -66,8 +66,6 @@ TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config els
 
 # 正規表現のメタ文字をエスケープ
 COMMAND_PREFIX_ESCAPED = re.sub(r'([\*|\\|\.|\+|\?|\{|\}|\(|\)|\[|\]|\^|\$|\|])', r'\\\1', COMMAND_PREFIX)
-print(COMMAND_PREFIX)
-print(COMMAND_PREFIX_ESCAPED)
 
 bot = commands.Bot(intents=intents, command_prefix=COMMAND_PREFIX)
 client = discord.Client(intents=intents)
@@ -154,11 +152,13 @@ async def on_message(message):
     # モデルに保存
     enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
-    if TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
+    # 反応してお喋りする
+    if bot.user in message.mentions :
+        await _talk_m(message, message.reply)
+    elif TALK_DETECTION_RE is not None and re.search(TALK_DETECTION_RE, message.content) :
         await _talk_m(message, message.channel.send)
 
     await yomiage(message, message.author.display_name, 'さん')
-
 
 async def yomiage(message, username, keisyou)  :
     if eniaIsIn and (message.channel.id == text_channel_id) :
