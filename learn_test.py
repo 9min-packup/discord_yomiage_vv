@@ -55,7 +55,11 @@ if os.path.isfile(TALKGEN_MODEL_FILE) :
 
 
 # 字句解析
-with open(INPUT_FILE) as f:
-    for line in f:
-       enqueue_talkgen_model(talkgen_model_queue, tokenizer, line)
-       np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
+try :
+    with open(INPUT_FILE) as f:
+        for line in f:
+            enqueue_talkgen_model(talkgen_model_queue, tokenizer, line)
+            np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
+except FileNotFoundError:
+    print(f"{CONFIG_FILE}ファイルがありません")
+    exit()
