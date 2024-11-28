@@ -58,7 +58,11 @@ $talk_check kusa
 $talk_rm kusa
 
 チャンネルの履歴から学習する（admin権限が必要です）
-$learn_history {整数(メッセージの数)}
+$learn_history {整数。読み込むメッセージの数}
+
+サーバー内のすべてのテキストチャンネルの履歴から学習する（admin権限が必要です）
+指定する数値は各チャンネルに適応されます。
+$learn_channels_history {整数。読み込むメッセージの数}
 
 学習結果を忘れる（admin権限が必要です）
 $learn_forget

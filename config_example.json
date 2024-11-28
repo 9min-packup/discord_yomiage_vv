@@ -9,7 +9,7 @@
     "voice_speed_scale_margin": 0.6,
     "voice_speed_pitch": 0.0,
     "talk_detection_re": "読み上げちゃん|読み上げさん|読み上げくん|読み上げ君",
-    "talk_model_len": 1000,
+    "talk_model_len": 10000,
     "tries_min": 100,
     "tries_max": 500,
     "statesize_min": 2,

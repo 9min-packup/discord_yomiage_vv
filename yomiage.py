@@ -105,10 +105,9 @@ def remove_mention_channel(text):
     return re.sub(r'<[@|#][-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+?>', '', text)
 
 def remove_url(text):
-    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+?)','', text)
+    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
 
 def conbine_emoji_tag(text):
-#    return re.sub(r'<[\t\n\r\f\v]*:[\t\n\r\f\v]*(-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+)[[\t\n\r\f\v]*:[\t\n\r\f\v]*([0-9]+)[\t\n\r\f\v]*>', r'<:\1:\2>', text)
      return re.sub(r'<[ ]*?:[ ]+?([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?)[ ]+?:[ ]+?([0-9]+?)[ ]+?>', r'<:\1:\2>', text)
 
 
@@ -126,7 +125,6 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
         return
     s = tokenizer.parse(s)
     s = conbine_emoji_tag(s)
-    print(s)
     queue.append(s)
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
@@ -218,7 +216,7 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
 
     count = (count + 1) % 100
 
-    s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+?)','ゆーあーるえる', text)
+    s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
     args = { 'user' : user, 'text' : s }
     word_replace(args)
     args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?):([0-9]+?)>', r' \1 ', remove_mention_channel(args['text']))
@@ -654,17 +652,32 @@ async def learn_history(ctx, arg : str) :
 
     await ctx.message.add_reaction('🙌')
     limit = int(arg)
-    await _learn_history(ctx, limit)
+    await _learn_history(ctx.channel, limit)
 
     await ctx.message.add_reaction('👍')
 
-async def _learn_history(ctx, limit): 
+@bot.command()
+async def learn_channels_history(ctx, arg : str) :
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
+    await ctx.message.add_reaction('🙌')
+    limit = int(arg)
+
+    for ch in ctx.guild.text_channels :
+        await _learn_history(ch, limit)
+
+    await ctx.message.add_reaction('👍')
+
+async def _learn_history(channel, limit): 
     limit = limit if limit else 0
     limit = limit if limit >= 0 else 0
     limit = limit if limit <= TALK_MODEL_LEN else TALK_MODEL_LEN
-    async for message in ctx.channel.history(
+    async for message in channel.history(
         limit=limit,
-        oldest_first=True,
+        oldest_first=False,
     ):
         if message.author.bot:
             continue
