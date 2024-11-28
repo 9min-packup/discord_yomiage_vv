@@ -15,7 +15,7 @@ from pydub import AudioSegment
 import random
 import markovify
 import MeCab
-
+import copy
 
 VV_TUMUGI = 8
 VV_HIMARI = 14
@@ -57,6 +57,7 @@ except FileNotFoundError:
 
 TOKEN = config['token']
 COMMAND_PREFIX = config["command_prefix"] if "command_prefix" in config else "$"
+SKIP_READING_PREFIX_LIST = config["skip_reading_prefix_list"] if "skip_reading_prefix_list" in config else ["/", "$", "!"]
 TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config else TALKGEN_STATESIZE_MAX_DEFAULT
 ADMIN_USER_ID_LIST = config["admin_user_id_list"] if "admin_user_id_list" in config else []
 for i in range(0 ,len(ADMIN_USER_ID_LIST)): 
@@ -76,6 +77,10 @@ TALKGEN_STATESIZE_MAX = config["statesize_max"] if "statesize_max" in config els
 
 # 正規表現のメタ文字をエスケープ
 COMMAND_PREFIX_ESCAPED = re.sub(r'([\*|\\|\.|\+|\?|\{|\}|\(|\)|\[|\]|\^|\$|\|])', r'\\\1', COMMAND_PREFIX)
+tmp_list = copy.deepcopy(SKIP_READING_PREFIX_LIST)
+for i in range(0, len(tmp_list)) :
+    tmp_list[i] = re.sub(r'([\*|\\|\.|\+|\?|\{|\}|\(|\)|\[|\]|\^|\$|\|])', r'\\\1', tmp_list[i])
+SKIP_READING_PREFIX_ESCAPED = "|".join(tmp_list)
 
 # 再生まわりの設定
 voice_speed_scale = config["voice_speed_scale"] if "voice_speed_scale" in config else 1.0
@@ -171,11 +176,11 @@ async def on_message(message):
     if len(message.content) <= 0 :
         return
 
-    if message.content[0] == '/' :
-        return
-
     if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content):
         await bot.process_commands(message)
+        return
+
+    if re.match(rf'^{SKIP_READING_PREFIX_ESCAPED}', message.content):
         return
 
     # モデルに保存
@@ -647,7 +652,13 @@ async def learn_history(ctx, arg : str) :
         await ctx.message.add_reaction('💤')
         return
 
+    await ctx.message.add_reaction('🙌')
     limit = int(arg)
+    await _learn_history(ctx, limit)
+
+    await ctx.message.add_reaction('👍')
+
+async def _learn_history(ctx, limit): 
     limit = limit if limit else 0
     limit = limit if limit >= 0 else 0
     limit = limit if limit <= TALK_MODEL_LEN else TALK_MODEL_LEN
@@ -660,17 +671,17 @@ async def learn_history(ctx, arg : str) :
 
         if len(message.content) <= 0 :
             continue
-
-        if message.content[0] == '/' :
+    
+        if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content) :
             continue
 
-        if re.match(rf'^{COMMAND_PREFIX_ESCAPED}', message.content) :
+        if re.match(rf'^{SKIP_READING_PREFIX_ESCAPED}', message.content):
             continue
 
         enqueue_talkgen_model(talkgen_model_queue, tokenizer, message.content) 
     
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
-    await ctx.message.add_reaction('👍')
+
 
 @bot.command()
 async def learn_forget(ctx) :
