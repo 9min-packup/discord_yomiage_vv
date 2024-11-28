@@ -93,28 +93,36 @@ vv_character = VV_TUMUGI
 voiceChannel: VoiceChannel = None
 text_channel_id=-1
 
-def escape_emoji(text):
-    return re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r':\1:', text)
+# def escape_emoji(text):
+#     return re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+):([0-9]+)>', r':\1:', text)
 
 def remove_mention_channel(text):
-    return re.sub(r'<[@|#][-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+>', '', text)
+    return re.sub(r'<[@|#][-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+?>', '', text)
 
 def remove_url(text):
-    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
+    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+?)','', text)
 
-def restore_emoji(match, emojis):
-    emoji_name = match.group(1) 
-    search_result_list = list(filter(lambda x: x.name == emoji_name, emojis))
-    if len(search_result_list) <= 0 :
-        return f':{emoji_name}:'
+def conbine_emoji_tag(text):
+#    return re.sub(r'<[\t\n\r\f\v]*:[\t\n\r\f\v]*(-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+)[[\t\n\r\f\v]*:[\t\n\r\f\v]*([0-9]+)[\t\n\r\f\v]*>', r'<:\1:\2>', text)
+     return re.sub(r'<[ ]*?:[ ]+?([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?)[ ]+?:[ ]+?([0-9]+?)[ ]+?>', r'<:\1:\2>', text)
 
-    return str(search_result_list[0])
+
+# def restore_emoji(match, emojis):
+#     emoji_name = match.group(1) 
+#     search_result_list = list(filter(lambda x: x.name == emoji_name, emojis))
+#     if len(search_result_list) <= 0 :
+#         return f':{emoji_name}:'
+# 
+#     return str(search_result_list[0])
 
 def enqueue_talkgen_model(queue, tokenizer, text) :
-    s = escape_emoji(remove_url(remove_mention_channel(text)))
+    s = remove_url(remove_mention_channel(text))
     if len(s) <= 0 or re.fullmatch(r'[ 　]*', s) :
         return
-    queue.append(tokenizer.parse(s))
+    s = tokenizer.parse(s)
+    s = conbine_emoji_tag(s)
+    print(s)
+    queue.append(s)
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
@@ -205,10 +213,10 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
 
     count = (count + 1) % 100
 
-    s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
+    s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+?)','ゆーあーるえる', text)
     args = { 'user' : user, 'text' : s }
     word_replace(args)
-    args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+):([0-9]+)>', r' \1 ', remove_mention_channel(args['text']))
+    args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?):([0-9]+?)>', r' \1 ', remove_mention_channel(args['text']))
 
     #文字数が多い時は省略
     if len(args['text']) >= (VOICE_TEXT_LEN_MAX - 7 ) :
@@ -592,8 +600,8 @@ async def _talk_m(message, send, state_size=None, tries=None) :
     # 文章の整形
     talk_text = talk_text_parse(talk_text)
 
-    # 絵文字を復元する
-    talk_text = re.sub(r':([a-zA-Z0-9_]+):', lambda m: restore_emoji(m, message.guild.emojis), talk_text)
+    # 絵文字を復元する（未使用）
+    # talk_text = re.sub(r':([a-zA-Z0-9_]+?):', lambda m: restore_emoji(m, message.guild.emojis), talk_text)
 
     await send(talk_text)
     
@@ -621,7 +629,7 @@ def talk_text_parse(text):
             after_alphabet_flag = False
             continue
 
-        m_alphabet_word = re.match(r'[a-zA-Z0-9-_.!~*\(\);?\@&=+\$,%#\"\'\`\<\>]+', talk_text_array[i])
+        m_alphabet_word = re.match(r'[a-zA-Z0-9-_.!~*\(\);?\@&=+\$,%#\"\'\`\<\>]+?', talk_text_array[i])
         if m_alphabet_word:
             if not emoji_flag and after_alphabet_flag:
                 talk_text_array[i] = ' ' + m_alphabet_word.group(0)
