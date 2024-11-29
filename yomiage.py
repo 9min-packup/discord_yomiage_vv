@@ -116,6 +116,35 @@ def conbine_matched_emoji_tag(match):
     id_str = match.group(2)
     return fr'<:{emoji_alias_str}:{id_str}>'
 
+def remove_misskey_hashtag(text):
+    return re.sub(r'#[^\t\n\r\f\v ]+', '', text)
+
+def remove_misskey_mention(text):
+    return re.sub(r'@[-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+', '', text)
+
+def remove_misskey_MFM(text):
+    s = text
+    # $[] 系を削除する
+    s = re.sub(r'\$\[.*\]','', text)
+    s = re.sub(r'\$\[.*?','', s)
+    # リンクを削除する
+    s = re.sub(r'\??\[.*\]\((.*\))',r'\1', s)
+    s = remove_url(s)
+    # 太字を削除する
+    s = re.sub(r'\*\*(.*?)\*\*',r'\1', s)
+    # イタリックを削除する
+    s = re.sub(r'_(.*?)_',r'\1', s)
+    # <small> <center> <plain>を削除
+    s = re.sub(r'<center>|</center>|<\\center>|<¥center>|<small>|</small>|<\\small>|<¥small>|<plain>|</plain>|<\\plain>|<¥plain>','', s)
+    # コードを削除
+    s = re.sub(r'`(.*?)`',r' \1 ', s)
+    s = re.sub(r'```(.*?)```',r' \1 ', s)
+    s = re.sub(r'\*\*(.*?)\*\*',r'\1', s)
+    # 絵文字を削除
+    s = re.sub(r':.*?:', '', s)
+
+    return s
+
 
 # def restore_emoji(match, emojis):
 #     emoji_name = match.group(1) 
@@ -132,6 +161,16 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
     s = tokenizer.parse(s)
     s = conbine_emoji_tag(s)
     queue.append(s)
+    # len が長い場合は削る
+    while len(queue) > TALK_MODEL_LEN :
+        queue.popleft()
+
+def enqueue_misskey_text_to_talkgen_model(queue, tokenizer, text) :
+    s = remove_misskey_MFM(remove_misskey_hashtag(remove_misskey_mention(text)))
+    if len(s) <= 0 or re.fullmatch(r'[ 　]*', s) :
+        return
+    queue.append(tokenizer.parse(s))
+    print(s)
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
@@ -713,6 +752,57 @@ async def learn_forget(ctx) :
     talkgen_model_queue = deque()
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
     await ctx.message.add_reaction('👍')
+
+@bot.command()
+async def learn_misskey_notes(ctx, arg : str) :
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
+    limit = int(arg)
+
+    if ctx.message.attachments is None :
+         await ctx.send('添付ファイルを確認できません。')
+         return
+
+    if len(ctx.message.attachments) <= 0 :
+         await ctx.send('添付ファイルがありません。1つのテキストファイル(.json)を添付してください。')
+         return
+
+    if len(ctx.message.attachments) >= 2 :
+         await ctx.send('添付ファイルが多すぎます。1つのテキストファイル(.json)を添付してください')
+         return
+
+    attachment = ctx.message.attachments[0]
+    if attachment.content_type is None or attachment.content_type != 'application/json; charset=utf-8' :
+        print(attachment.content_type)
+        await ctx.send('テキストファイル(.json 文字コード utf-8)を添付してください。')
+        return
+
+    b = await attachment.read()
+    text = b.decode(encoding='utf-8')
+    
+    await ctx.message.add_reaction('🙌')
+
+    await _learn_misskey_notes(text, limit)
+
+    await ctx.message.add_reaction('👍')
+
+async def _learn_misskey_notes(text, limit): 
+    limit = limit if limit else 0
+    limit = limit if limit >= 0 else 0
+    limit = limit if limit <= TALK_MODEL_LEN else TALK_MODEL_LEN
+    note_list = json.loads(text)
+    for i in range(0, len(note_list)):
+        if i + 1 > limit :
+            break
+        if  note_list[i]["cw"] is not None:
+            enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note_list[i]["cw"])
+        if  note_list[i]["text"] is not None:
+            enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note_list[i]["text"])        
+    
+    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
 
 
 @bot.command()
