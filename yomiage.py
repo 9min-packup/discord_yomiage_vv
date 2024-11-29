@@ -102,13 +102,18 @@ text_channel_id=-1
 #     return re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+):([0-9]+)>', r':\1:', text)
 
 def remove_mention_channel(text):
-    return re.sub(r'<[@|#][-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+?>', '', text)
+    return re.sub(r'<[@|#][\-_\.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+?>', '', text)
 
 def remove_url(text):
-    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
+    return re.sub(r'(https?|ftp)(:\/\/[\-\_\.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
 
 def conbine_emoji_tag(text):
-     return re.sub(r'<[ ]*?:[ ]+?([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?)[ ]+?:[ ]+?([0-9]+?)[ ]+?>', r'<:\1:\2>', text)
+     return re.sub(r'<[ ]*?:([ 　\-\_\.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+):[ ]+?([0-9]+?)[ ]+?>', conbine_matched_emoji_tag, text)
+
+def conbine_matched_emoji_tag(match):
+    emoji_alias_str = "".join(match.group(1).split())
+    id_str = match.group(2)
+    return fr'<:{emoji_alias_str}:{id_str}>'
 
 
 # def restore_emoji(match, emojis):
@@ -125,6 +130,7 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
         return
     s = tokenizer.parse(s)
     s = conbine_emoji_tag(s)
+    print(s)
     queue.append(s)
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
@@ -216,10 +222,10 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
 
     count = (count + 1) % 100
 
-    s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
+    s = re.sub(r'(https?|ftp)(:\/\/[\-_\.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
     args = { 'user' : user, 'text' : s }
     word_replace(args)
-    args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?):([0-9]+?)>', r' \1 ', remove_mention_channel(args['text']))
+    args['text'] = re.sub(r'<:([\-_\.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?):([0-9]+?)>', r' \1 ', remove_mention_channel(args['text']))
 
     #文字数が多い時は省略
     if len(args['text']) >= (VOICE_TEXT_LEN_MAX - 7 ) :
