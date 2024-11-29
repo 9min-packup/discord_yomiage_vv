@@ -130,7 +130,6 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
         return
     s = tokenizer.parse(s)
     s = conbine_emoji_tag(s)
-    print(s)
     queue.append(s)
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
