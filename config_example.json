@@ -17,6 +17,7 @@
     "misskey": {
         "host": "your misskey host tld",
         "token": "your misskey access token",
-        "list_id": "your misskey list id"
+        "timeline": "home or local or global or list",
+        "list_id": "your misskey list id or null"
     }
 }
