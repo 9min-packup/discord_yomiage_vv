@@ -9,7 +9,7 @@ class Note :
         self.fileIds = dict["fileIds"]
         self.files = []
         for obj in dict["files"]:
-            self.files.appenf(DriveFile(obj))
+            self.files.append(DriveFile(obj))
         dict["files"]
         self.text = dict["text"]
         self.text = dict["text"]

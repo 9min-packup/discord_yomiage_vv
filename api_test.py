@@ -1,5 +1,4 @@
 from misskey_api import *
-from logger import *
 import re
 import os
 import json
@@ -20,17 +19,25 @@ MISSKEY_TOKEN = MISSKEY_CONFIG['token']
 MISSEKY_LIST_ID = MISSKEY_CONFIG['list_id']
 
 api = MisskeyApi(MISSKEY_HOST, MISSKEY_TOKEN)
-logger = Logger()
 
-async def main():
+async def my_loop():
     try:
         r = await api.show_user()
         print(r)
     except Exception as e:
         print(e)
-    await api.list_streaming(MISSKEY_TOKEN, MISSEKY_LIST_ID, withFiles=False, withRenotes=False)
+    #await api.htl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=on_note_recieved)
+    #await api.ltl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=on_note_recieved)
+    await api.gtl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=on_note_recieved)
+    # await api.list_streaming(MISSKEY_TOKEN, MISSEKY_LIST_ID, onReceive=on_note_recieved)
     
 
-asyncio.run(main())
+def on_note_recieved(data):
+    note = Note(data["body"]["body"])
+    print(note.id)
+    print(note.text)
+
+
+asyncio.run(my_loop())
 
 

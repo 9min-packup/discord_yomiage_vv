@@ -75,7 +75,50 @@ class MisskeyApi:
             moderation_logs.append(ModerationLog(i))
         return moderation_logs
 
-    async def list_streaming(self, token, listId, withFiles=True, withRenotes=True):
+    async def gtl_streaming(self, token, withFiles=False, withRenotes=True, onReceive=None):
+        conntection_data = {
+            "type": "connect",
+            "body": {
+                "channel": "globalTimeline",
+                "id": str(uuid.uuid4()),
+                "params": {
+                    "withFiles": withFiles,
+                    "withRenotes": withRenotes
+                }       
+            }
+        }
+        await self.request_streaming(token, conntection_data, onReceive)
+
+    async def ltl_streaming(self, token, withReplies=False, withFiles=False, withRenotes=True, onReceive=None):
+        conntection_data = {
+            "type": "connect",
+            "body": {
+                "channel": "localTimeline",
+                "id": str(uuid.uuid4()),
+                "params": {
+                    "withFiles": withFiles,
+                    "withReplies": withReplies,
+                    "withRenotes": withRenotes
+                }       
+            }
+        }
+        await self.request_streaming(token, conntection_data, onReceive)
+
+    async def htl_streaming(self, token, withFiles=False, withRenotes=True, onReceive=None):
+        conntection_data = {
+            "type": "connect",
+            "body": {
+                "channel": "homeTimeline",
+                "id": str(uuid.uuid4()),
+                "params": {
+                    "withFiles": withFiles,
+                    "withRenotes": withRenotes
+                }       
+            }
+        }
+        await self.request_streaming(token, conntection_data, onReceive)
+
+    async def list_streaming(self, token, listId, withFiles=False, withRenotes=True, onReceive=None):
         conntection_data = {
             "type": "connect",
             "body": {
@@ -88,9 +131,9 @@ class MisskeyApi:
                 }       
             }
         }
-        await self.request_streaming(token, conntection_data)
+        await self.request_streaming(token, conntection_data, onReceive)
 
-    async def request_streaming(self, token, conntection_data):
+    async def request_streaming(self, token, conntection_data, onReceive=None):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(f"{self.base_url_ws}/streaming?i={token}", method="GET") as ws:
                 await ws.send_json(conntection_data)
@@ -98,9 +141,9 @@ class MisskeyApi:
                 async for msg in ws:
                     print('msg received from server:')
                     if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                        print('close: ', aiohttp.WSMsgType)
                         break
-                    if msg.type == aiohttp.WSMsgType.TEXT:
-                        print(msg.json())
-                        print(Note(msg.json()["body"]["body"]))
+                    if msg.type == aiohttp.WSMsgType.TEXT and onReceive is not None:
+                        onReceive(msg.json())
 
 
