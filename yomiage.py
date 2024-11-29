@@ -16,6 +16,7 @@ import random
 import markovify
 import MeCab
 import copy
+from misskey_api import *
 
 VV_TUMUGI = 8
 VV_HIMARI = 14

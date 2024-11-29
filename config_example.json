@@ -13,5 +13,10 @@
     "tries_min": 100,
     "tries_max": 500,
     "statesize_min": 2,
-    "statesize_max": 6
+    "statesize_max": 6,
+    "misskey": {
+        "host": "your misskey host tld",
+        "token": "your misskey access token",
+        "list_id": "your misskey list id"
+    }
 }

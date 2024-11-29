@@ -46,7 +46,6 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
-    np.save(TALKGEN_MODEL_FILE, queue)
 
 talkgen_model_queue = deque()
 # おはなし（マルコフ連鎖）機能
