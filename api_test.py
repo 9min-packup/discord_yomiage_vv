@@ -28,9 +28,8 @@ async def main():
         print(r)
     except Exception as e:
         print(e)
-    r = await api.stream()
-    print(r)
-
+    await api.list_streaming(MISSKEY_TOKEN, MISSEKY_LIST_ID, withFiles=False, withRenotes=False)
+    
 
 asyncio.run(main())
 

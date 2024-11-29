@@ -1,6 +1,7 @@
 from .model import *
 from .exception import *
 import json
+import uuid
 import aiohttp
 import asyncio
 
@@ -9,7 +10,7 @@ class MisskeyApi:
     def __init__(self, host, token):
         self.host = host
         self.base_url = f"https://{host}"
-        self.base_url_webhook = f"wss://{host}"
+        self.base_url_ws = f"wss://{host}"
         self.token = token
 
     async def request_api(self, endpoint, params):
@@ -74,5 +75,32 @@ class MisskeyApi:
             moderation_logs.append(ModerationLog(i))
         return moderation_logs
 
+    async def list_streaming(self, token, listId, withFiles=True, withRenotes=True):
+        conntection_data = {
+            "type": "connect",
+            "body": {
+                "channel": "userList",
+                "id": str(uuid.uuid4()),
+                "params": {
+                    "listId": listId,
+                    "withFiles": withFiles,
+                    "withRenotes": withRenotes
+                }       
+            }
+        }
+        await self.request_streaming(token, conntection_data)
+
+    async def request_streaming(self, token, conntection_data):
+        async with aiohttp.ClientSession() as session:
+            async with session.ws_connect(f"{self.base_url_ws}/streaming?i={token}", method="GET") as ws:
+                await ws.send_json(conntection_data)
+                print(ws)
+                async for msg in ws:
+                    print('msg received from server:')
+                    if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                        break
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        print(msg.json())
+                        print(Note(msg.json()["body"]["body"]))
 
 

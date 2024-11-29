@@ -85,5 +85,5 @@ try :
                  enqueue_talkgen_model(talkgen_model_queue, tokenizer, note["text"])        
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
 except FileNotFoundError:
-    print(f"{CONFIG_FILE}ファイルがありません")
+    print(f"{INPUT_FILE}ファイルがありません")
     exit()
