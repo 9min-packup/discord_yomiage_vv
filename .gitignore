@@ -7,3 +7,4 @@ config.json
 **/__pycache__/**
 learned_data.json
 input.txt
+notes.json

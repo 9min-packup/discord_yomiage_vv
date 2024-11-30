@@ -16,6 +16,8 @@ import random
 import markovify
 import MeCab
 import copy
+from misskey_api import *
+import asyncio
 
 VV_TUMUGI = 8
 VV_HIMARI = 14
@@ -63,12 +65,11 @@ ADMIN_USER_ID_LIST = config["admin_user_id_list"] if "admin_user_id_list" in con
 for i in range(0 ,len(ADMIN_USER_ID_LIST)): 
     if type(ADMIN_USER_ID_LIST[i]) is str :
         ADMIN_USER_ID_LIST[i] = int(ADMIN_USER_ID_LIST[i])
-
     
 BOTNAME = config["botname"] if "botname" in config else "読み上げちゃん"
 BOTNAME_VC = config["botname_vc"] if "botname_vc" in config else "読み上げちゃん"
 
-TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else NONE
+TALK_DETECTION_RE = config["talk_detection_re"] if "talk_detection_re" in config else None
 TALK_MODEL_LEN = config["talk_model_len"] if "talk_model_len" in config else TALKGEN_MODEL_LEN_DEFAULT
 TALKGEN_MODEL_TRIES_MIN = config["tries_min"] if "tries_min" in config else TALKGEN_MODEL_TRIES_MIN_DEFAULT
 TALKGEN_MODEL_TRIES_MAX = config["tries_max"] if "tries_max" in config else TALKGEN_MODEL_TRIES_MAX_DEFAULT
@@ -98,17 +99,62 @@ vv_character = VV_TUMUGI
 voiceChannel: VoiceChannel = None
 text_channel_id=-1
 
+# Misskey
+MISSKEY_CONFIG = config['misskey'] if "misskey" in config else None
+MISSKEY_HOST = MISSKEY_CONFIG['host']
+MISSKEY_TOKEN = MISSKEY_CONFIG['token']
+MISSEKY_TIMELINE = MISSKEY_CONFIG['timeline']
+MISSEKY_LIST_ID = MISSKEY_CONFIG['list_id'] if "list_id" in MISSKEY_CONFIG else None
+
+api = MisskeyApi(MISSKEY_HOST, MISSKEY_TOKEN)
+
+misskey_task = None
+
 # def escape_emoji(text):
 #     return re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+):([0-9]+)>', r':\1:', text)
 
 def remove_mention_channel(text):
-    return re.sub(r'<[@|#][-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+?>', '', text)
+    return re.sub(r'<[@|#][\-_\.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+?>', '', text)
 
 def remove_url(text):
-    return re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
+    return re.sub(r'(https?|ftp)(:\/\/[\-\_\.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','', text)
 
 def conbine_emoji_tag(text):
-     return re.sub(r'<[ ]*?:[ ]+?([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?)[ ]+?:[ ]+?([0-9]+?)[ ]+?>', r'<:\1:\2>', text)
+     return re.sub(r'<[ ]*?:([ 　\-\_\.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+):[ ]+?([0-9]+?)[ ]+?>', conbine_matched_emoji_tag, text)
+
+def conbine_matched_emoji_tag(match):
+    emoji_alias_str = "".join(match.group(1).split())
+    id_str = match.group(2)
+    return fr'<:{emoji_alias_str}:{id_str}>'
+
+def remove_misskey_hashtag(text):
+    return re.sub(r'#[^\t\n\r\f\v ]+', '', text)
+
+def remove_misskey_mention(text):
+    return re.sub(r'@[-_.!~*a-zA-Z0-9;\/?\@&=+\$,%#]+', '', text)
+
+def remove_misskey_MFM(text):
+    s = text
+    # $[] 系を削除する
+    s = re.sub(r'\$\[.*\]','', text)
+    s = re.sub(r'\$\[.*?','', s)
+    # リンクを削除する
+    s = re.sub(r'\??\[.*\]\((.*\))',r'\1', s)
+    s = remove_url(s)
+    # 太字を削除する
+    s = re.sub(r'\*\*(.*?)\*\*',r'\1', s)
+    # イタリックを削除する
+    s = re.sub(r'_(.*?)_',r'\1', s)
+    # <small> <center> <plain>を削除
+    s = re.sub(r'<center>|</center>|<\\center>|<¥center>|<small>|</small>|<\\small>|<¥small>|<plain>|</plain>|<\\plain>|<¥plain>','', s)
+    # コードを削除
+    s = re.sub(r'`(.*?)`',r' \1 ', s)
+    s = re.sub(r'```(.*?)```',r' \1 ', s)
+    s = re.sub(r'\*\*(.*?)\*\*',r'\1', s)
+    # 絵文字を削除
+    s = re.sub(r':.*?:', '', s)
+
+    return s
 
 
 # def restore_emoji(match, emojis):
@@ -126,6 +172,15 @@ def enqueue_talkgen_model(queue, tokenizer, text) :
     s = tokenizer.parse(s)
     s = conbine_emoji_tag(s)
     queue.append(s)
+    # len が長い場合は削る
+    while len(queue) > TALK_MODEL_LEN :
+        queue.popleft()
+
+def enqueue_misskey_text_to_talkgen_model(queue, tokenizer, text) :
+    s = remove_misskey_MFM(remove_misskey_hashtag(remove_misskey_mention(text)))
+    if len(s) <= 0 or re.fullmatch(r'[ 　]*', s) :
+        return
+    queue.append(tokenizer.parse(s))
     # len が長い場合は削る
     while len(queue) > TALK_MODEL_LEN :
         queue.popleft()
@@ -162,6 +217,9 @@ count = 0
 @bot.event
 async def on_ready():
     print('サーバーにログインしました')
+    if MISSKEY_CONFIG is not None:
+        await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+
 
 @bot.event
 async def on_message(message):
@@ -216,10 +274,10 @@ async def play_voice_vox(message, user, keisyou, text, speaker):
 
     count = (count + 1) % 100
 
-    s = re.sub(r'(https?|ftp)(:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
+    s = re.sub(r'(https?|ftp)(:\/\/[\-_\.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#]+)','ゆーあーるえる', text)
     args = { 'user' : user, 'text' : s }
     word_replace(args)
-    args['text'] = re.sub(r'<:([-_.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?):([0-9]+?)>', r' \1 ', remove_mention_channel(args['text']))
+    args['text'] = re.sub(r'<:([\-_\.!~*a-zA-Z0-9;\/?\@&=\+\$,%#]+?):([0-9]+?)>', r' \1 ', remove_mention_channel(args['text']))
 
     #文字数が多い時は省略
     if len(args['text']) >= (VOICE_TEXT_LEN_MAX - 7 ) :
@@ -708,6 +766,57 @@ async def learn_forget(ctx) :
     np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
     await ctx.message.add_reaction('👍')
 
+@bot.command()
+async def learn_misskey_notes(ctx, arg : str) :
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
+    limit = int(arg)
+
+    if ctx.message.attachments is None :
+         await ctx.send('添付ファイルを確認できません。')
+         return
+
+    if len(ctx.message.attachments) <= 0 :
+         await ctx.send('添付ファイルがありません。1つのテキストファイル(.json)を添付してください。')
+         return
+
+    if len(ctx.message.attachments) >= 2 :
+         await ctx.send('添付ファイルが多すぎます。1つのテキストファイル(.json)を添付してください')
+         return
+
+    attachment = ctx.message.attachments[0]
+    if attachment.content_type is None or attachment.content_type != 'application/json; charset=utf-8' :
+        print(attachment.content_type)
+        await ctx.send('テキストファイル(.json 文字コード utf-8)を添付してください。')
+        return
+
+    b = await attachment.read()
+    text = b.decode(encoding='utf-8')
+    
+    await ctx.message.add_reaction('🙌')
+
+    await _learn_misskey_notes(text, limit)
+
+    await ctx.message.add_reaction('👍')
+
+async def _learn_misskey_notes(text, limit): 
+    limit = limit if limit else 0
+    limit = limit if limit >= 0 else 0
+    limit = limit if limit <= TALK_MODEL_LEN else TALK_MODEL_LEN
+    note_list = json.loads(text)
+    for i in range(0, len(note_list)):
+        if i + 1 > limit :
+            break
+        if  note_list[i]["cw"] is not None:
+            enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note_list[i]["cw"])
+        if  note_list[i]["text"] is not None:
+            enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note_list[i]["text"])        
+    
+    np.save(TALKGEN_MODEL_FILE, talkgen_model_queue)
+
 
 @bot.command()
 async def set_speed(ctx, arg : str) :
@@ -726,5 +835,103 @@ async def set_pitch(ctx, arg : str) :
     global voice_speed_pitch
     voice_speed_pitch = float(arg)
     await ctx.message.add_reaction('👍')
+
+
+
+@bot.command()
+async def connect_misskey(ctx) :
+    global misskey_task
+
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
+    if misskey_task is None:
+       await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+       await ctx.message.add_reaction('👍')
+       return
+    else:
+        try:
+            misskey_task.result()
+            await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+            await ctx.message.add_reaction('👍')
+            return
+        except asyncio.CancelledError:
+            await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+            await ctx.message.add_reaction('👍')
+            return
+        except asyncio.InvalidStateError:
+            await ctx.send(f'接続中です -> {MISSKEY_HOST}')
+            return
+    await ctx.message.add_reaction('💤')
+
+@bot.command()
+async def check_connect_misskey(ctx) :
+    global misskey_task
+
+    # admin 権限は「不要」
+
+    if misskey_task is None:
+        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        return 
+    try:
+        misskey_task.result()
+        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        return
+    except asyncio.CancelledError:
+        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        return
+    except asyncio.InvalidStateError:
+        await ctx.send(f'接続中です -> {MISSKEY_HOST}')
+        return
+
+@bot.command()
+async def disconnect_misskey(ctx) :
+    global misskey_task
+
+    # admin 権限が必要
+    if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
+        await ctx.message.add_reaction('💤')
+        return
+
+    if misskey_task is None:
+        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        return 
+    try:
+        misskey_task.result()
+        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        return
+    except asyncio.CancelledError:
+        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        return
+    except asyncio.InvalidStateError:
+        misskey_task.cancel()
+        await ctx.message.add_reaction('👍')
+        return
+
+    await ctx.message.add_reaction('💤')
+
+
+async def start_misskey_streaming(host, token, timeline, listId=None, onReceive=None):
+    global misskey_task
+    if timeline == "home":
+        misskey_task = asyncio.create_task(api.htl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=onReceive))
+    elif timeline == "local":
+        misskey_task = asyncio.create_task(api.ltl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=onReceive))
+    if timeline == "global":
+        misskey_task = asyncio.create_task(api.gtl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=onReceive))
+    elif timeline == "list" and listId is not None:
+        misskey_task = asyncio.create_task(api.list_streaming(MISSKEY_TOKEN, listId, withRenotes=False, onReceive=onReceive))
+    else:
+        printf("timeline の指定に誤りがあります。")
+
+def on_note_recieved(data):
+    note = data["body"]["body"]
+    if  note["cw"] is not None:
+        enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["cw"])
+    if  note["text"] is not None:
+        enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["text"])        
+
 
 bot.run(TOKEN)
