@@ -218,7 +218,7 @@ count = 0
 async def on_ready():
     print('サーバーにログインしました')
     if MISSKEY_CONFIG is not None:
-        await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+        await start_misskey_streaming(api, MISSEKY_TIMELINE, listId=MISSEKY_LIST_ID, onReceive=on_note_recieved)
 
 
 @bot.event
@@ -840,7 +840,7 @@ async def set_pitch(ctx, arg : str) :
 
 @bot.command()
 async def connect_misskey(ctx) :
-    global misskey_task
+    global api, misskey_task
 
     # admin 権限が必要
     if not check_admin(ctx.author.id , ADMIN_USER_ID_LIST):
@@ -848,21 +848,21 @@ async def connect_misskey(ctx) :
         return
 
     if misskey_task is None:
-       await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
-       await ctx.message.add_reaction('👍')
-       return
+        await start_misskey_streaming(api, MISSEKY_TIMELINE, listId=MISSEKY_LIST_ID, onReceive=on_note_recieved)
+        await ctx.message.add_reaction('👍')
+        return
     else:
         try:
             misskey_task.result()
-            await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+            await start_misskey_streaming(api, MISSEKY_TIMELINE, listId=MISSEKY_LIST_ID, onReceive=on_note_recieved)
             await ctx.message.add_reaction('👍')
             return
         except asyncio.CancelledError:
-            await start_misskey_streaming(MISSKEY_HOST, MISSKEY_TOKEN, MISSEKY_TIMELINE, MISSEKY_LIST_ID, on_note_recieved)
+            await start_misskey_streaming(api, MISSEKY_TIMELINE, listId=MISSEKY_LIST_ID, onReceive=on_note_recieved)
             await ctx.message.add_reaction('👍')
             return
         except asyncio.InvalidStateError:
-            await ctx.send(f'接続中です -> {MISSKEY_HOST}')
+            await ctx.send(f'接続中です -> {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
             return
     await ctx.message.add_reaction('💤')
 
@@ -873,17 +873,17 @@ async def check_connect_misskey(ctx) :
     # admin 権限は「不要」
 
     if misskey_task is None:
-        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        await ctx.send(f'切断されています: {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return 
     try:
         misskey_task.result()
-        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        await ctx.send(f'切断されています: {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return
     except asyncio.CancelledError:
-        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        await ctx.send(f'切断されています: {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return
     except asyncio.InvalidStateError:
-        await ctx.send(f'接続中です -> {MISSKEY_HOST}')
+        await ctx.send(f'接続中です -> {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return
 
 @bot.command()
@@ -896,14 +896,14 @@ async def disconnect_misskey(ctx) :
         return
 
     if misskey_task is None:
-        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        await ctx.send(f'切断されています: {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return 
     try:
         misskey_task.result()
-        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        await ctx.send(f'切断されています: {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return
     except asyncio.CancelledError:
-        await ctx.send(f'切断されています: {MISSKEY_HOST}')
+        await ctx.send(f'切断されています: {MISSKEY_HOST} : {MISSEKY_TIMELINE}')
         return
     except asyncio.InvalidStateError:
         misskey_task.cancel()
@@ -913,18 +913,18 @@ async def disconnect_misskey(ctx) :
     await ctx.message.add_reaction('💤')
 
 
-async def start_misskey_streaming(host, token, timeline, listId=None, onReceive=None):
+async def start_misskey_streaming(api, timeline, listId=None, onReceive=None):
     global misskey_task
     if timeline == "home":
-        misskey_task = asyncio.create_task(api.htl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=onReceive))
+        misskey_task = asyncio.create_task(api.htl_streaming(withRenotes=False, onReceive=onReceive))
     elif timeline == "local":
-        misskey_task = asyncio.create_task(api.ltl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=onReceive))
-    if timeline == "global":
-        misskey_task = asyncio.create_task(api.gtl_streaming(MISSKEY_TOKEN, withRenotes=False, onReceive=onReceive))
+        misskey_task = asyncio.create_task(api.ltl_streaming(withRenotes=False, onReceive=onReceive))
+    elif timeline == "global":
+        misskey_task = asyncio.create_task(api.gtl_streaming(withRenotes=False, onReceive=onReceive))
     elif timeline == "list" and listId is not None:
-        misskey_task = asyncio.create_task(api.list_streaming(MISSKEY_TOKEN, listId, withRenotes=False, onReceive=onReceive))
+        misskey_task = asyncio.create_task(api.list_streaming(listId, withRenotes=False, onReceive=onReceive))
     else:
-        printf("timeline の指定に誤りがあります。")
+        print(f"timeline の指定に誤りがあります。: {timeline}")
 
 def on_note_recieved(data):
     note = data["body"]["body"]

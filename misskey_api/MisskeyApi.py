@@ -75,7 +75,7 @@ class MisskeyApi:
             moderation_logs.append(ModerationLog(i))
         return moderation_logs
 
-    async def gtl_streaming(self, token, withFiles=False, withRenotes=True, onReceive=None):
+    async def gtl_streaming(self, withFiles=False, withRenotes=True, onReceive=None):
         conntection_data = {
             "type": "connect",
             "body": {
@@ -87,9 +87,9 @@ class MisskeyApi:
                 }       
             }
         }
-        await self.request_streaming(token, conntection_data, onReceive)
+        await self.request_streaming(conntection_data, onReceive)
 
-    async def ltl_streaming(self, token, withReplies=False, withFiles=False, withRenotes=True, onReceive=None):
+    async def ltl_streaming(self, withReplies=False, withFiles=False, withRenotes=True, onReceive=None):
         conntection_data = {
             "type": "connect",
             "body": {
@@ -102,9 +102,9 @@ class MisskeyApi:
                 }       
             }
         }
-        await self.request_streaming(token, conntection_data, onReceive)
+        await self.request_streaming(conntection_data, onReceive)
 
-    async def htl_streaming(self, token, withFiles=False, withRenotes=True, onReceive=None):
+    async def htl_streaming(self, withFiles=False, withRenotes=True, onReceive=None):
         conntection_data = {
             "type": "connect",
             "body": {
@@ -116,9 +116,9 @@ class MisskeyApi:
                 }       
             }
         }
-        await self.request_streaming(token, conntection_data, onReceive)
+        await self.request_streaming(conntection_data, onReceive)
 
-    async def list_streaming(self, token, listId, withFiles=False, withRenotes=True, onReceive=None):
+    async def list_streaming(self, listId, withFiles=False, withRenotes=True, onReceive=None):
         conntection_data = {
             "type": "connect",
             "body": {
@@ -131,11 +131,11 @@ class MisskeyApi:
                 }       
             }
         }
-        await self.request_streaming(token, conntection_data, onReceive)
+        await self.request_streaming(conntection_data, onReceive)
 
-    async def request_streaming(self, token, conntection_data, onReceive=None):
+    async def request_streaming(self, conntection_data, onReceive=None):
         async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(f"{self.base_url_ws}/streaming?i={token}", method="GET") as ws:
+            async with session.ws_connect(f"{self.base_url_ws}/streaming?i={self.token}", method="GET") as ws:
                 await ws.send_json(conntection_data)
                 async for msg in ws:
                     if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
