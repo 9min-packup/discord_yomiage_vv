@@ -137,9 +137,7 @@ class MisskeyApi:
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(f"{self.base_url_ws}/streaming?i={token}", method="GET") as ws:
                 await ws.send_json(conntection_data)
-                print(ws)
                 async for msg in ws:
-                    print('msg received from server:')
                     if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                         print('close: ', aiohttp.WSMsgType)
                         break
