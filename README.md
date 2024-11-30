@@ -10,13 +10,10 @@ VOICEVOX と連携して Discord チャンネルの文章を読み上げる Bot�
 -   マルコフ連鎖によるおしゃべり
 -   mp3 ファイルの登録と再生
 
-
 misskey ブランチの読み上げちゃんは Misskey のノートを購読して学習します。
 
 単一の個人サーバーで運用することを想定しています。\
 VOICEVOX と各キャラクターの規約を遵守して使用しましょう。
-
-
 
 ### コマンド一覧
 
@@ -91,7 +88,7 @@ Misskey サーバーに接続する（起動時に自動で接続します）
 $connect_misskey
 
 Misskey サーバーとの接続をチェックする
-$check_connect_misskey
+$check_misskey
 
 Misskey サーバーから切断する。
 $disconnect_misskey

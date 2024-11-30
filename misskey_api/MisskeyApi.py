@@ -134,14 +134,18 @@ class MisskeyApi:
         await self.request_streaming(conntection_data, onReceive)
 
     async def request_streaming(self, conntection_data, onReceive=None):
-        async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(f"{self.base_url_ws}/streaming?i={self.token}", method="GET") as ws:
-                await ws.send_json(conntection_data)
-                async for msg in ws:
-                    if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
-                        print('close: ', aiohttp.WSMsgType)
-                        break
-                    if msg.type == aiohttp.WSMsgType.TEXT and onReceive is not None:
-                        onReceive(msg.json())
+        while True:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(f"{self.base_url_ws}/streaming?i={self.token}", method="GET") as ws:
+                    print('connected : ', self.base_url_ws)
+                    await ws.send_json(conntection_data)
+                    async for msg in ws:
+                        if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            print('close: ', msg.type)
+                            break
+                        if msg.type == aiohttp.WSMsgType.TEXT and onReceive is not None:
+                            onReceive(msg.json())
+                    print('closed: ', ws.closed)
+            await asyncio.sleep(0.1)
 
 
