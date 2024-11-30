@@ -867,7 +867,7 @@ async def connect_misskey(ctx) :
     await ctx.message.add_reaction('💤')
 
 @bot.command()
-async def check_connect_misskey(ctx) :
+async def check_misskey(ctx) :
     global misskey_task
 
     # admin 権限は「不要」
@@ -932,6 +932,5 @@ def on_note_recieved(data):
         enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["cw"])
     if  note["text"] is not None:
         enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["text"])        
-
 
 bot.run(TOKEN)
