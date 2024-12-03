@@ -927,10 +927,17 @@ async def start_misskey_streaming(api, timeline, listId=None, onReceive=None):
         print(f"timeline の指定に誤りがあります。: {timeline}")
 
 def on_note_recieved(data):
+    print(data)
+    if data is None:
+        return
+    if not "body" in data:
+        return
+    if not "body" in data["body"]:
+        return
     note = data["body"]["body"]
-    if  note["cw"] is not None:
+    if  "cw" in note and note["cw"] is not None:
         enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["cw"])
-    if  note["text"] is not None:
-        enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["text"])        
+    if  "text" in note and note["text"] is not None:
+        enqueue_misskey_text_to_talkgen_model(talkgen_model_queue, tokenizer, note["text"])
 
 bot.run(TOKEN)
