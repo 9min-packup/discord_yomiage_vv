@@ -648,7 +648,7 @@ async def _talk_m(message, send, state_size=None, tries=None) :
     s_size = random.randint(TALKGEN_STATESIZE_MIN, TALKGEN_STATESIZE_MAX) if state_size is None else state_size
 
     # learn model from text.
-    text_model = markovify.NewlineText(''.join(talkgen_model_queue), state_size=s_size)
+    text_model = markovify.NewlineText(talkgen_model_queue, state_size=s_size)
 
     t = random.randint(TALKGEN_MODEL_TRIES_MIN, TALKGEN_MODEL_TRIES_MAX) if tries is None else tries
 
